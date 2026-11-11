@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>24ドボン ―次期ボスを決める六夜の抗争―</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <!-- 入口 -->
+  <section id="screen-entry" class="screen">
+    <h1 class="title">24ドボン</h1>
+    <p class="subtitle">― 次期ボスを決める六夜の抗争 ―</p>
+    <div class="panel">
+      <label>マフィアの名前（幹部名）<input id="in-name" maxlength="16" placeholder="例: ドン・ワジュ"></label>
+      <div class="row gap">
+        <button id="btn-test" class="big gold">1人でテストプレイ</button>
+      </div>
+      <details class="settings-box">
+        <summary>部屋を作る（設定）</summary>
+        <label>対戦の長さ
+          <select id="in-rounds">
+            <option value="6">6ラウンド（標準・六夜の抗争）</option>
+            <option value="8">8ラウンド</option>
+            <option value="10">10ラウンド</option>
+            <option value="time">時間制</option>
+            <option value="any">任意終了（ホストが決める）</option>
+          </select>
+        </label>
+        <label>時間制の長さ
+          <select id="in-minutes">
+            <option value="30">30分</option>
+            <option value="60" selected>60分</option>
+            <option value="90">90分</option>
+            <option value="120">120分</option>
+            <option value="0">無制限</option>
+          </select>
+        </label>
+        <label>脱落（破門）
+          <select id="in-elimination">
+            <option value="1" selected>あり（公式形・崖っぷちチップ）</option>
+            <option value="0">なし（マイナスOK）</option>
+          </select>
+        </label>
+        <label>手番の制限時間
+          <select id="in-turnlimit">
+            <option value="0" selected>オフ</option>
+            <option value="15">15秒</option><option value="30">30秒</option>
+            <option value="45">45秒</option><option value="60">60秒</option>
+            <option value="75">75秒</option><option value="90">90秒</option>
+            <option value="105">105秒</option><option value="120">120秒</option>
+          </select>
+        </label>
+        <button id="btn-create" class="big">部屋を作る</button>
+      </details>
+      <div class="join-box">
+        <label>部屋コードで参加<input id="in-code" maxlength="4" placeholder="ABCD" class="code-input"></label>
+        <button id="btn-join" class="big">参加する</button>
+      </div>
+      <p id="entry-error" class="error"></p>
+    </div>
+    <div class="panel art-gallery">
+      <h3>カード見本</h3>
+      <div class="gallery">
+        <img src="24.webp" alt="24番地"><img src="0.webp" alt="0番地・修道院">
+        <img src="7.webp" alt="7・顔役"><img src="11.webp" alt="11・内通者"><img src="2.webp" alt="2・押し付け">
+      </div>
+    </div>
+  </section>
+
+  <!-- ロビー -->
+  <section id="screen-lobby" class="screen hidden">
+    <h2>部屋 <span id="lobby-code" class="code-badge"></span></h2>
+    <p class="hint">このコードを友達に伝えてね。全員が名前を付けたらホストが開始できます。</p>
+    <div id="lobby-players" class="player-list"></div>
+    <label>自分の名前を変更<input id="in-name2" maxlength="16"></label>
+    <p id="lobby-settings" class="hint"></p>
+    <button id="btn-start" class="big gold">抗争開始</button>
+    <p id="lobby-wait" class="hint"></p>
+  </section>
+
+  <!-- 対戦 -->
+  <section id="screen-game" class="screen hidden">
+    <header id="topbar">
+      <span id="round-label"></span>
+      <span id="time-label"></span>
+      <span class="spacer"></span>
+      <button id="btn-discard" class="mini">捨て札</button>
+      <button id="btn-sound" class="mini">音: ON</button>
+      <button id="btn-assist" class="mini">補助: ON</button>
+    </header>
+    <div id="opponents"></div>
+    <div id="field-area">
+      <div id="deck-pile" class="pile">山札<br><span id="deck-count"></span></div>
+      <div id="field-card"></div>
+      <div id="field-info"></div>
+    </div>
+    <div id="banner" class="hidden"></div>
+    <div id="action-area"></div>
+    <div id="my-status"></div>
+    <div id="hand"></div>
+    <div id="hand-totals"></div>
+    <button id="btn-dobon" class="dobon-btn" disabled>ドボン</button>
+    <div id="host-tools" class="hidden">
+      <button id="btn-end-reserve" class="mini">この夜で終了</button>
+      <button id="btn-end-now" class="mini danger">即時終了</button>
+    </div>
+  </section>
+</div>
+
+<!-- 全画面ドボン返し -->
+<div id="kaeshi-overlay" class="hidden">
+  <div class="kaeshi-inner">
+    <p class="kaeshi-title">罠だった！</p>
+    <button id="btn-kaeshi">ドボン返し！</button>
+    <p class="kaeshi-note"><span id="kaeshi-sec">3</span>秒で自動発動</p>
+  </div>
+</div>
+
+<!-- モーダル -->
+<div id="modal" class="hidden"><div id="modal-box"></div></div>
+
+<script src="client.js"></script>
+</body>
+</html>
