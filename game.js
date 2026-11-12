@@ -5,7 +5,8 @@
  */
 
 // ---- カード ----
-// card: { id, num, suit:'W'|'B'|null, arrow:'up'|'down', draw5?:true, doubleFaced?:true }
+// card: { id, num, suit:'W'|'B'|null, arrow:'up'|'down', draw5?:true, doubleFaced?:true, artVariant?:string }
+// artVariant は24専用の「表示用」絵柄（casino|tower|hq）。ゲーム判定には一切影響しない
 function buildDeck() {
   const cards = [];
   let seq = 0;
@@ -14,9 +15,9 @@ function buildDeck() {
   };
   // オールマイティ
   add(0, null, 'up');
-  add(24, null, 'down');
-  add(24, null, 'down');
-  add(24, null, 'down', { doubleFaced: true }); // 両面表の24（所在が全員に見える）
+  add(24, null, 'down', { artVariant: 'casino' }); // 通常24×2: カジノ／高層タワー
+  add(24, null, 'down', { artVariant: 'tower' });
+  add(24, null, 'down', { doubleFaced: true, artVariant: 'hq' }); // 両面表の24=本部（所在が全員に見える）
   // 1
   add(1, 'W', 'up'); add(1, 'W', 'up');
   add(1, 'B', 'up', { draw5: true }); // ドロー5の黒1（視覚的に区別する1枚）
@@ -122,7 +123,7 @@ function applyTransfers(players, transfers, eliminationOn) {
     if (!payer) continue;
     const payees = transfers.filter((x) => x.from === payerId);
     if (eliminationOn && total > payer.score) {
-      // 崖っぷち or 脱落: 残高全額を勝者へ均等配分（端数は箱へ）
+      // 庇護の証 or 脱落: 残高全額を勝者へ均等配分（端数は箱へ）
       const balance = Math.max(0, payer.score);
       if (payer.chip === 'gake') {
         payer.chip = 'shi';

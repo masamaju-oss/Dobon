@@ -17,9 +17,9 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 const server = http.createServer((req, res) => {
   let p = decodeURIComponent(req.url.split('?')[0]);
   if (p === '/') p = '/index.html';
-  const file = path.join(PUBLIC, p);
   const DENY = ['/server.js', '/game.js', '/package.json', '/package-lock.json'];
   if (DENY.includes(p) || p.startsWith('/test/')) { res.writeHead(404); res.end('not found'); return; }
+  const file = path.join(PUBLIC, p);
   if (!file.startsWith(PUBLIC) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
     res.writeHead(404); res.end('not found'); return;
   }
@@ -42,8 +42,12 @@ const DEFAULT_SETTINGS = {
   minutes: 60,          // 時間制: 30/60/90/120/0(無制限)
   elimination: true,    // 脱落ON（公式形）が初期値
   turnLimit: 0,         // 手番制限秒。0=オフ、15〜120
-  dobonSec: 3.5,        // ドボン受付の確定空白
+  dobonSec: 2.5,        // ドボン受付の確定空白（2026-11-11 本人指示で3.5→2.5秒に短縮）
 };
+
+// プレイヤーカラー（update4・ユーザー決定）: 入室順に割り振る。カードの色ルールとは別枠。
+// 5人目（紫）はユーザー未指定のため仮置き（BUILD_LOG update4 参照）
+const PLAYER_COLORS = ['赤', '青', '緑', '黄', '紫'];
 
 function mkPlayer(name, isCPU = false) {
   return {
@@ -51,10 +55,15 @@ function mkPlayer(name, isCPU = false) {
     ws: null, connected: false,
     hand: [], score: 50, chip: 'gake', revealed: new Set(),
     readyNext: false,
+    colorIdx: 0,        // プレイヤーカラーの添字（部屋への参加時に確定）
+    touchIndex: null,   // 「いま触れている手札の位置」。中身ではなく位置だけを他者へ共有する
   };
 }
+// 部屋の参加順で色を割り振る（参加を取り消す仕組みが無いため添字は席順で安定する）
+function assignColor(room, player) { player.colorIdx = Math.min(room.players.length, PLAYER_COLORS.length - 1); }
 
 function mkRoom(host, settings) {
+  host.colorIdx = 0; // ホストは1席目（赤）
   return {
     code: newCode(), hostId: host.id,
     settings: { ...DEFAULT_SETTINGS, ...settings },
@@ -89,7 +98,36 @@ function nextSeat(room, id) {
   const i = seatIdx(room, id);
   return room.players[(i + 1) % room.players.length];
 }
-function event(room, kind) { room.lastEvent = { kind, seq: ++room.eventSeq, at: Date.now() }; }
+// data: 効果発動の内訳（fx種別・対象・枚数など）。クライアントのバナー/効果音/警告表示に使う
+function event(room, kind, data = {}) { room.lastEvent = { kind, seq: ++room.eventSeq, at: Date.now(), ...data }; }
+
+// 「触れている位置」の共有（update4）: 位置（手札の添字）だけを本人以外へ送る。
+// 手札の中身は一切送らない。手札の構成が変わる操作では呼び出し側が clearTouch で消す
+function sendTouch(room, player) {
+  for (const p of room.players) {
+    if (p !== player && p.ws && p.ws.readyState === 1) {
+      send(p.ws, { t: 'touchCard', playerId: player.id, index: player.touchIndex });
+    }
+  }
+}
+function clearTouch(room, player, notify = true) {
+  if (player.touchIndex === null) return;
+  player.touchIndex = null;
+  if (notify) sendTouch(room, player);
+}
+function doTouch(room, player, index) {
+  // ゲーム中フェーズでのみ有効。CPUは対象外（クライアントを持たない）
+  if (!['turn', 'dobonWindow', 'dobonExtra', 'kaeshi', 'startChoice'].includes(room.phase)) return false;
+  let idx = null;
+  if (index !== null && index !== undefined && index !== -1) {
+    if (!Number.isInteger(index) || index < 0 || index >= player.hand.length) return false;
+    idx = index;
+  }
+  if (player.touchIndex === idx) return true; // 変化なしなら送らない
+  player.touchIndex = idx;
+  sendTouch(room, player);
+  return true;
+}
 
 function drawCards(room, player, n) {
   const drawn = [];
@@ -100,7 +138,7 @@ function drawCards(room, player, n) {
     player.hand.push(c);
     drawn.push(c);
   }
-  if (drawn.length) event(room, 'draw');
+  if (drawn.length) { event(room, 'draw'); clearTouch(room, player); } // 手札が増えたら触れている位置は無効
   return drawn;
 }
 function reshuffle(room) {
@@ -133,7 +171,7 @@ function startRound(room) {
       Date.now() - room.startedAt >= room.settings.minutes * 60000) room.forceLastRound = true;
 
   room.deck = G.shuffle(G.buildDeck());
-  for (const p of room.players) { p.hand = []; p.revealed = new Set(); p.readyNext = false; }
+  for (const p of room.players) { p.hand = []; p.revealed = new Set(); p.readyNext = false; p.touchIndex = null; }
   const marker = P(room, room.markerId);
   const order = [];
   let cur = marker;
@@ -162,11 +200,14 @@ function startRound(room) {
     room.startChoice = { kind: 'dir', playerId: room.markerId };
   } else if (top.num === 2) {
     room.pendingDraw = 2;
+    event(room, 'fx', { fx: 'draw2', targetId: room.markerId, total: 2 });
   } else if (top.num === 11) {
     room.pendingReveal = 1;
+    event(room, 'fx', { fx: 'reveal11', targetId: room.markerId, total: 1 });
   } else if (top.draw5) {
     // 最初の場札がドロー5黒1だった場合: スタートプレイヤーが5枚引く
-    drawCards(room, marker, 5);
+    drawCards(room, marker, 5); // drawCards の 'draw' イベントに上書きされないよう、fx通知は後から出す
+    event(room, 'fx', { fx: 'draw5', targetId: room.markerId, amount: 5 });
   }
   beginTurn(room);
   broadcast(room);
@@ -242,6 +283,7 @@ function doPlay(room, player, cardId, choice = {}, isAuto = false) {
   if (card.num === 7 && !choice.dir) return false;
 
   clearTimer(room, 'turn');
+  clearTouch(room, player); // 出したら「触れている位置」は消える（手札の添字もずれる）
   player.hand.splice(idx, 1);
   player.revealed.delete(cardId);
   room.discard.push(card);
@@ -251,7 +293,7 @@ function doPlay(room, player, cardId, choice = {}, isAuto = false) {
   room.passCount = 0;
   room.mustNagashi = false;
   room.reservation = null;
-  event(room, 'play');
+  event(room, 'play', { playerId: player.id, cardId: card.id }); // クライアントの「場へ飛ぶ＋大写し」演出用
 
   // ドボン受付（3.5秒の確定空白）
   room.phase = 'dobonWindow';
@@ -339,14 +381,27 @@ function finishPlay(room, w) {
   if (card.draw5) {
     room.reservation = null; // ドロー5は予約自動取消
     const nx = nextSeat(room, player.id);
-    drawCards(room, nx, 5);
-    room.currentId = player.id;
-    advance(room); advance(room); // 出した人の次（引いた人）を飛ばして次へ
+    // 効果の分かりやすさ対策: 先に効果を全員へ知らせ（バナー・効果音）、一拍置いてから実際に配る
+    event(room, 'fx', { fx: 'draw5', targetId: nx.id, amount: 5 });
+    room.phase = 'fxWait';
     broadcast(room); scheduleCPU(room);
+    setTimer(room, 'fx', 1150, () => {
+      if (room.phase !== 'fxWait') return;
+      drawCards(room, nx, 5);
+      room.currentId = player.id;
+      advance(room); advance(room); // 出した人の次（引いた人）を飛ばして次へ
+      broadcast(room); scheduleCPU(room);
+    });
     return;
   }
-  if (card.num === 2) room.pendingDraw += 2;
-  if (card.num === 11) room.pendingReveal += 1;
+  if (card.num === 2) {
+    room.pendingDraw += 2;
+    event(room, 'fx', { fx: 'draw2', targetId: nextSeat(room, player.id).id, total: room.pendingDraw });
+  }
+  if (card.num === 11) {
+    room.pendingReveal += 1;
+    event(room, 'fx', { fx: 'reveal11', targetId: nextSeat(room, player.id).id, total: room.pendingReveal });
+  }
 
   room.currentId = player.id;
   // 予約があれば、効果競合ルールを確認して実行
@@ -380,6 +435,31 @@ function doReserve(room, player, cardId, choice = {}) {
   if (!player.hand.some((c) => c.id === cardId)) return false;
   room.reservation = { playerId: player.id, cardId, choice };
   broadcast(room);
+  return true;
+}
+
+function doReorder(room, player, order) {
+  // 手札の並び替え: IDの集合が現在の手札と完全一致する場合のみ採用する（順序以外の変更は一切しない）
+  if (!Array.isArray(order) || order.length !== player.hand.length) return false;
+  if (new Set(order).size !== order.length) return false; // 重複IDを拒否
+  const byId = new Map(player.hand.map((c) => [c.id, c]));
+  const next = [];
+  for (const id of order) {
+    const c = byId.get(id);
+    if (!c) return false; // 手札に無いIDが混ざっていたら全体を拒否
+    next.push(c);
+  }
+  const changed = next.some((c, i) => c !== player.hand[i]);
+  player.hand = next;
+  clearTouch(room, player); // 並びが変わったら「触れている位置」は意味を失う
+  broadcast(room);
+  if (changed) {
+    // 相手画面の裏向きカード列を揺らすための軽量イベント。
+    // 状態broadcastの「後」に送る: 先に再描画された列へアニメーションを当てるため
+    for (const p of room.players) {
+      if (p !== player && p.ws && p.ws.readyState === 1) send(p.ws, { t: 'handShuffle', playerId: player.id });
+    }
+  }
   return true;
 }
 
@@ -417,7 +497,7 @@ function doReveal(room, player, isAuto = false) {
   const picked = G.pickRevealCards(player.hand, room.pendingReveal);
   for (const c of picked) player.revealed.add(c.id);
   room.pendingReveal = 0;
-  event(room, 'reveal');
+  event(room, 'reveal', { playerId: player.id, cardIds: picked.map((c) => c.id) });
   advance(room);
   broadcast(room); scheduleCPU(room);
   return true;
@@ -495,7 +575,7 @@ function gameOver(room) {
 }
 
 // ---------- 状態ビュー（個人別） ----------
-function publicCard(c) { return { id: c.id, num: c.num, suit: c.suit, arrow: c.arrow, draw5: !!c.draw5, pts: G.cardPoints(c) }; }
+function publicCard(c) { return { id: c.id, num: c.num, suit: c.suit, arrow: c.arrow, draw5: !!c.draw5, pts: G.cardPoints(c), art: c.artVariant || null, df: !!c.doubleFaced }; }
 function viewFor(room, me) {
   const now = Date.now();
   const total = { '6': 6, '8': 8, '10': 10 }[room.settings.rounds] || null;
@@ -539,6 +619,8 @@ function viewFor(room, me) {
     players: room.players.map((p) => ({
       id: p.id, name: p.name, isCPU: p.isCPU, connected: p.connected || p.isCPU,
       isHost: p.id === room.hostId, isMarker: p.id === room.markerId,
+      colorIdx: p.colorIdx, colorName: PLAYER_COLORS[p.colorIdx],
+      readyNext: p.readyNext, // 精算モーダルの「誰を待っているか」表示用
       score: p.score, chip: room.settings.elimination ? p.chip : 'off',
       handCount: p.hand.length,
       // 公開情報: 11で公開されたカード + 両面24の所在
@@ -547,7 +629,9 @@ function viewFor(room, me) {
     })),
     me: {
       id: me.id, name: me.name, isHost: me.id === room.hostId,
-      hand: me.hand.map(publicCard),
+      colorIdx: me.colorIdx, colorName: PLAYER_COLORS[me.colorIdx],
+      // open: 11で公開され全員に見えている自分のカード（目印表示用。本人の分のみ追加情報）
+      hand: me.hand.map((c) => ({ ...publicCard(c), open: me.revealed.has(c.id) })),
       handNumSum: G.handNumberSum(me.hand),
       handPointSum: G.handPointSum(me.hand),
       isMyTurn, playable, drewThisTurn: room.drewThisTurn,
@@ -659,6 +743,7 @@ wss.on('connection', (ws) => {
             for (let i = 0; i < n && myRoom.players.length < 5; i++) {
               const cpu = mkPlayer(CPU_NAMES[i % CPU_NAMES.length], true);
               cpu.connected = true;
+              assignColor(myRoom, cpu);
               myRoom.players.push(cpu);
             }
           }
@@ -668,11 +753,12 @@ wss.on('connection', (ws) => {
         }
         case 'join': {
           const room = rooms.get((m.code || '').toUpperCase());
-          if (!room) return send(ws, { t: 'error', msg: '部屋が見つかりません' });
-          if (room.phase !== 'lobby') return send(ws, { t: 'error', msg: '対戦が始まっています' });
-          if (room.players.length >= 5) return send(ws, { t: 'error', msg: '満員です' });
+          if (!room) return send(ws, { t: 'error', msg: '部屋が見つからない' });
+          if (room.phase !== 'lobby') return send(ws, { t: 'error', msg: '抗争はもう始まっている' });
+          if (room.players.length >= 5) return send(ws, { t: 'error', msg: '満員で席がない' });
           myPlayer = mkPlayer((m.name || '').slice(0, 16) || '幹部');
           myPlayer.ws = ws; myPlayer.connected = true;
+          assignColor(room, myPlayer);
           room.players.push(myPlayer);
           myRoom = room;
           send(ws, { t: 'joined', code: room.code, playerId: myPlayer.id, token: myPlayer.token });
@@ -681,9 +767,9 @@ wss.on('connection', (ws) => {
         }
         case 'rejoin': {
           const room = rooms.get((m.code || '').toUpperCase());
-          if (!room) return send(ws, { t: 'error', msg: '部屋が見つかりません' });
+          if (!room) return send(ws, { t: 'error', msg: '部屋が見つからない' });
           const p = room.players.find((x) => x.token === m.token);
-          if (!p) return send(ws, { t: 'error', msg: '席が見つかりません' });
+          if (!p) return send(ws, { t: 'error', msg: '席が見つからない' });
           myRoom = room; myPlayer = p;
           p.ws = ws; p.connected = true;
           send(ws, { t: 'joined', code: room.code, playerId: p.id, token: p.token });
@@ -709,9 +795,11 @@ wss.on('connection', (ws) => {
         }
         case 'startChoice': if (myRoom && myPlayer) doStartChoice(myRoom, myPlayer, m); break;
         case 'draw': if (myRoom && myPlayer) doDraw(myRoom, myPlayer); break;
-        case 'play': if (myRoom && myPlayer) { if (!doPlay(myRoom, myPlayer, m.cardId, m)) send(ws, { t: 'error', msg: 'そのカードは出せません' }); } break;
+        case 'play': if (myRoom && myPlayer) { if (!doPlay(myRoom, myPlayer, m.cardId, m)) send(ws, { t: 'error', msg: 'そのカードは出せない' }); } break;
         case 'pass': if (myRoom && myPlayer) doPass(myRoom, myPlayer); break;
         case 'reserve': if (myRoom && myPlayer) doReserve(myRoom, myPlayer, m.cardId, m); break;
+        case 'touch': if (myRoom && myPlayer) doTouch(myRoom, myPlayer, m.index); break;
+        case 'reorder': if (myRoom && myPlayer) doReorder(myRoom, myPlayer, m.order); break;
         case 'dobon': if (myRoom && myPlayer) declareDobon(myRoom, myPlayer); break;
         case 'kaeshi': if (myRoom && myPlayer) doKaeshi(myRoom, myPlayer); break;
         case 'drawPending': if (myRoom && myPlayer) doDrawPending(myRoom, myPlayer); break;
@@ -754,13 +842,14 @@ wss.on('connection', (ws) => {
       }
     } catch (e) {
       console.error('handler error', e);
-      send(ws, { t: 'error', msg: '処理に失敗しました' });
+      send(ws, { t: 'error', msg: '処理に失敗した' });
     }
   });
   ws.on('close', () => {
     if (myRoom && myPlayer) {
       myPlayer.connected = false;
       myPlayer.ws = null;
+      clearTouch(myRoom, myPlayer); // 切断したら「触れている」表示も消す
       if (myRoom.phase === 'turn' && myRoom.currentId === myPlayer.id) armTurnTimer(myRoom);
       if (myRoom.phase === 'settle') {
         myPlayer.readyNext = true;
@@ -771,4 +860,9 @@ wss.on('connection', (ws) => {
   });
 });
 
-server.listen(PORT, () => console.log(`24ドボン Web版 listening on :${PORT}`));
+if (require.main === module) {
+  server.listen(PORT, () => console.log(`24ドボン Web版 listening on :${PORT}`));
+}
+
+// テスト用（スモークテストの再現ケースから内部関数を直接検証するため）
+module.exports = { mkRoom, mkPlayer, viewFor, doPlay, playableCards, closeWindow, doTouch, PLAYER_COLORS };

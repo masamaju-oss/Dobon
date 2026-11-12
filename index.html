@@ -17,6 +17,7 @@
       <div class="row gap">
         <button id="btn-test" class="big gold">1人でテストプレイ</button>
       </div>
+      <button id="btn-howto" class="big">遊び方（はじめての者はここから）</button>
       <details class="settings-box">
         <summary>部屋を作る（設定）</summary>
         <label>対戦の長さ
@@ -39,7 +40,7 @@
         </label>
         <label>脱落（破門）
           <select id="in-elimination">
-            <option value="1" selected>あり（公式形・崖っぷちチップ）</option>
+            <option value="1" selected>あり（公式形・庇護の証）</option>
             <option value="0">なし（マイナスOK）</option>
           </select>
         </label>
@@ -72,16 +73,18 @@
   <!-- ロビー -->
   <section id="screen-lobby" class="screen hidden">
     <h2>部屋 <span id="lobby-code" class="code-badge"></span></h2>
-    <p class="hint">このコードを友達に伝えてね。全員が名前を付けたらホストが開始できます。</p>
+    <p class="hint">このコードを仲間に渡せ。全員が名前を付けたら、ホストが抗争を開始できる。</p>
     <div id="lobby-players" class="player-list"></div>
     <label>自分の名前を変更<input id="in-name2" maxlength="16"></label>
     <p id="lobby-settings" class="hint"></p>
     <button id="btn-start" class="big gold">抗争開始</button>
+    <button id="btn-howto2" class="big">遊び方</button>
     <p id="lobby-wait" class="hint"></p>
   </section>
 
-  <!-- 対戦 -->
+  <!-- 対戦（横画面前提: 中央に木製の卓、相手は手番順に左・正面・右） -->
   <section id="screen-game" class="screen hidden">
+    <div id="error-band" class="hidden"></div>
     <header id="topbar">
       <span id="round-label"></span>
       <span id="time-label"></span>
@@ -89,19 +92,47 @@
       <button id="btn-discard" class="mini">捨て札</button>
       <button id="btn-sound" class="mini">音: ON</button>
       <button id="btn-assist" class="mini">補助: ON</button>
+      <button id="btn-oppnums" class="mini">相手の点数: 表示</button>
     </header>
-    <div id="opponents"></div>
-    <div id="field-area">
-      <div id="deck-pile" class="pile">山札<br><span id="deck-count"></span></div>
-      <div id="field-card"></div>
-      <div id="field-info"></div>
+    <div id="table-wrap">
+      <div id="seat-top" class="seat seat-top"></div>
+      <div id="seat-left" class="seat seat-side"></div>
+      <div id="seat-right" class="seat seat-side"></div>
+      <div id="table-center">
+        <div id="deck-pile" class="pile" title="山札">
+          <div class="card-back pile-stack"></div>
+          <span class="pile-label">山札 <span id="deck-count"></span></span>
+        </div>
+        <div id="field-col">
+          <div id="field-card"></div>
+          <div id="field-cond" class="hidden" title="場の条件"></div>
+        </div>
+        <div id="discard-pile" class="pile" title="捨て札（タップで一覧）">
+          <div id="discard-top"></div>
+          <span class="pile-label">捨て札 <span id="discard-count"></span></span>
+        </div>
+        <div id="field-info"></div>
+      </div>
+      <div id="banner" class="hidden"></div>
+      <div id="fx-banner" class="hidden"></div>
     </div>
-    <div id="banner" class="hidden"></div>
-    <div id="action-area"></div>
-    <div id="my-status"></div>
-    <div id="hand"></div>
-    <div id="hand-totals"></div>
-    <button id="btn-dobon" class="dobon-btn" disabled>ドボン</button>
+    <div id="my-area">
+      <div id="my-status"></div>
+      <div id="turn-banner" class="hidden"></div>
+      <div id="my-warning" class="hidden"></div>
+      <div id="hand-area">
+        <div class="hand-head">
+          <div id="hand-totals"></div>
+          <button id="btn-sort" class="mini">並び替え</button>
+        </div>
+        <div id="hand"></div>
+        <div id="my-bundles"></div>
+      </div>
+    </div>
+    <div id="bottom-bar">
+      <div id="action-area"></div>
+      <button id="btn-dobon" class="dobon-btn" disabled>ドボン</button>
+    </div>
     <div id="host-tools" class="hidden">
       <button id="btn-end-reserve" class="mini">この夜で終了</button>
       <button id="btn-end-now" class="mini danger">即時終了</button>
@@ -113,10 +144,16 @@
 <div id="kaeshi-overlay" class="hidden">
   <div class="kaeshi-inner">
     <p class="kaeshi-title">罠だった！</p>
+    <p id="kaeshi-detail"></p>
     <button id="btn-kaeshi">ドボン返し！</button>
     <p class="kaeshi-note"><span id="kaeshi-sec">3</span>秒で自動発動</p>
   </div>
 </div>
+
+<!-- 出たカードの大写し（全員表示・操作を妨げない） -->
+<div id="played-overlay" class="hidden"></div>
+<!-- 選択中カードの大写し（詳細確認＋条件選択・操作を妨げない） -->
+<div id="spotlight" class="hidden"></div>
 
 <!-- モーダル -->
 <div id="modal" class="hidden"><div id="modal-box"></div></div>
