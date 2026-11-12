@@ -1,6 +1,6 @@
 :root{
   --gold:#c9a227; --ink:#14161c; --paper:#f3ead8; --red:#a31621; --bg:#101014;
-  --card-w:66px;
+  --card-w:76px; /* update11: 自分の手札をモックの前景密度へ寄せて拡大（場＞手札の階層は維持） */
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0;background:var(--bg);color:#eee;font-family:"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif}
@@ -36,11 +36,15 @@ button:disabled{opacity:.4;cursor:default}
 /* 背景: 本番素材 table-bg.webp（files/production-assets/ 由来、1600幅・72KB）を背景として配置し、
    その上にUIを組む。画像はバー＋使い込まれた木の卓まで含むため、卓もこの写真が担う */
 #screen-game{max-width:none;margin:0;padding:0;height:100dvh;display:flex;flex-direction:column;overflow:hidden;
+  /* update11: モックの暖かい色温度に寄せるため、写真の上に暖色グラデーションを重ね、
+     背景をわずかに拡大（104%）して卓を手前に出す。素材自体は本番のまま差し替えない */
   --scene-bg:
-    url("table-bg.webp") center 65% / cover no-repeat,
+    radial-gradient(ellipse at 50% 36%, rgba(255,166,64,.15) 0%, rgba(255,166,64,0) 55%),
+    linear-gradient(180deg, rgba(74,38,9,.20) 0%, rgba(30,13,2,.05) 46%, rgba(0,0,0,.14) 100%),
+    url("table-bg.webp") center 63% / 104% auto no-repeat,
     linear-gradient(180deg,#37220f 0%, #261506 34%, #180c04 68%, #110802 100%);
   background:var(--scene-bg)}
-#topbar{display:flex;align-items:center;gap:8px;font-size:13px;color:#e8dcc4;padding:6px 10px;background:rgba(10,4,0,.45)}
+#topbar{display:flex;align-items:center;gap:8px;font-size:13px;color:#e8dcc4;padding:6px 10px;background:linear-gradient(180deg,rgba(10,4,0,.55),rgba(10,4,0,.20))}
 #topbar .spacer{flex:1}
 
 /* --- 卓 --- */
@@ -51,67 +55,101 @@ button:disabled{opacity:.4;cursor:default}
 
 /* --- 座席（自分=下辺 / 相手は手番順に 左→正面→右） --- */
 .seat{position:absolute;z-index:5;display:flex;gap:8px}
-.seat-top{top:8px;left:50%;transform:translateX(-50%);flex-direction:row;justify-content:center;max-width:92%}
-.seat-side{top:50%;transform:translateY(-50%);flex-direction:column;max-width:31%}
-#seat-left{left:8px}
-#seat-right{right:8px}
-.opp{background:rgba(16,10,5,.78);border:1px solid rgba(201,162,39,.35);border-radius:10px;padding:6px 8px;min-width:118px;max-width:200px;backdrop-filter:blur(2px)}
-.opp{border-left:4px solid var(--pc,#666)}
-.opp.active{border-color:var(--pc,var(--gold));box-shadow:0 0 0 1px var(--pc,var(--gold)), 0 0 14px var(--pc,var(--gold))}
-.opp .nm{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#f3ead8}
-.opp .meta{font-size:11px;color:#cdbf9f}
+.seat-top{top:2px;left:50%;transform:translateX(-50%);flex-direction:row;justify-content:center;max-width:92%}
+.seat-side{top:44%;transform:translateY(-50%);flex-direction:column;max-width:31%}
+#seat-left{left:clamp(6px,2.5vw,48px)}
+#seat-right{right:clamp(6px,2.5vw,48px)}
+/* 相手表示（update7・本人指示）: 四角い枠／パネルでの区切りはモックに無いため廃止。
+   相手を示すのは「名前ピル（小さな浮きラベル）／裏向き手札の扇／札束の山」を
+   卓の上に直接置いたもので、囲いの地・枠線・影は持たない。
+   手番の強調は枠ではなく、名前ピルのプレイヤーカラー発光＋裏面列の発光で行う */
+.opp{display:flex;flex-direction:column;align-items:center;gap:2px;max-width:300px}
+/* update11: 名前と枚数を1枚のプラークとして見せる（モックの名前ラベル）。
+   .nm（上段）と .meta（下段）に同じ地色を与え、上下でつながった浮きラベルにする */
+.opp .nm{display:inline-flex;align-items:center;font-weight:700;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#f3ead8;
+  background:rgba(10,6,3,.74);padding:3px 12px 1px;border-radius:10px 10px 0 0;text-shadow:0 1px 3px rgba(0,0,0,.85)}
+.opp.active .nm{box-shadow:0 0 0 1.5px var(--pc,var(--gold)), 0 0 13px var(--pc,var(--gold))}
+.opp .meta{font-size:11px;color:#e6d5a8;text-shadow:0 1px 3px rgba(0,0,0,.95);
+  background:rgba(10,6,3,.74);padding:0 12px 3px;border-radius:0 0 10px 10px}
+.opp.active .opp-backs{filter:drop-shadow(0 0 7px var(--pc,var(--gold)))}
+.opp .bundles{filter:drop-shadow(0 2px 3px rgba(0,0,0,.55))}
 .opp .open-cards{display:flex;gap:2px;margin-top:4px;flex-wrap:wrap}
 
 /* 相手の裏向きカード列（扇形にずらして重ねる）＋カード裏面（初版: 夜の街モノトーン+金、細い金の二重縁、中央に「24」の透かしとダイヤ格子） */
-.opp-backs{display:flex;align-items:flex-start;margin-top:5px;padding:4px 2px 0;min-height:35px;overflow:hidden}
+.opp-backs{display:flex;align-items:flex-start;margin-top:5px;padding:10px 2px 0;min-height:58px;overflow:hidden} /* 上paddingは公開位置の目アイコンのはみ出しを通す分（update10） */
 /* カード裏面: 本番素材（files/production-assets/ 由来）。ボスの目が縦横とも中心
    （横軸センターライン上）に来るよう切り取られた確定版。通常サイズは小サイズ用
    card-back-s.webp（500×700）、大きな山札の積みは card-back.webp（1000×1400）を使う。
    相手の裏面列・山札は同じ .card-back を使うため一括でこの絵になる */
 :root{--back-layer:url("card-back-s.webp") center / cover no-repeat}
-.card-back{position:relative;width:22px;height:31px;border-radius:3px;flex:0 0 auto;
+.card-back{position:relative;width:34px;height:48px;border-radius:4px;flex:0 0 auto;
   background:var(--back-layer);
   border:1px solid rgba(0,0,0,.6);
   box-shadow:0 1px 2px rgba(0,0,0,.55)}
 .card-back::after{content:""}
-.opp-backs .card-back + .card-back{margin-left:-12px}
-.opp-backs .card-back:nth-child(3n+1){transform:rotate(-5deg)}
-.opp-backs .card-back:nth-child(3n+2){transform:rotate(0deg) translateY(-2px)}
-.opp-backs .card-back:nth-child(3n){transform:rotate(5deg)}
+.opp-backs .card-back + .card-back{margin-left:-19px}
+/* update11: 扇の弧は client.js が席と位置から付ける連続値（--fan-rot / --fan-y）で作る。
+   旧・nth-child の -5/0/5 度の繰り返しは廃止（扇ではなく段々に見えたため） */
+.opp-backs .card-back{transform:rotate(var(--fan-rot,0deg)) translateY(var(--fan-y,0px));transform-origin:50% 88%}
 @keyframes backShuffle{0%{transform:translate(0,0) rotate(0deg)}30%{transform:translate(var(--j,4px),-5px) rotate(3deg)}55%{transform:translate(calc(var(--j,4px) * -0.8),2px) rotate(-2deg)}100%{transform:translate(0,0) rotate(0deg)}}
 .opp-backs.shuffling .card-back{animation:backShuffle .6s ease both}
+/* 公開中の目アイコン（update10・本人指定）: 横長楕円に金の目（eye-mark.webp）。
+   カードの上辺の中央に、アイコンの中心が上辺に一致する位置で重ねる
+   （下半分だけカードに重なり、上半分はカードの上に飛び出す）。幅はカード幅の約1.2倍 */
+.eye-mark{position:absolute;left:50%;top:0;transform:translate(-50%,-50%);z-index:7;pointer-events:none;
+  filter:drop-shadow(0 1px 2px rgba(0,0,0,.65))}
+/* 相手の扇: 公開位置の表面（小型）。裏面と同じ寸法・重なり・傾きを保ち、地色はスートで変える */
+.card-back.fan-open{background:#17181d;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.card-back.fan-open.w{background:#e9e4d8}
+.card-back.fan-open .fan-num{font-weight:900;font-size:11px;color:#f2f2f2;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.card-back.fan-open.w .fan-num{color:#191919;text-shadow:none}
+.card-back.fan-open .eye-mark{width:27px}
+/* 自分の手札: 公開中カードは上にはみ出すアイコンを通すため overflow を開き、隣より手前に出す。
+   アートとフレーバー帯は自前の角丸で元の見た目を保つ */
+#hand .card.is-open{overflow:visible;z-index:9}
+#hand .card.is-open .art{border-radius:6px}
+#hand .card.is-open .flavor{border-radius:0 0 6px 6px}
+#hand .card .eye-mark{width:118%}
+/* 公開中カードがある間だけ、手札エリアの上側にアイコンのはみ出し分（約20px）の余白を足す */
+#hand:has(.card.is-open){padding-top:26px}
 .chip-ico{display:inline-block;padding:1px 6px;border-radius:8px;font-size:11px;border:1px solid #666;background:#2a2c33}
 .chip-ico.dead{background:#3d0d12;border-color:var(--red);color:#ff9aa2}
 .chip-ico.disc{opacity:.45}
 
 /* --- 卓中央: 山札の積み／場札／捨て札の山 --- */
-#table-center{display:flex;align-items:center;gap:16px;justify-content:center;z-index:2}
-/* 天井ランプの光（update5・本人指示）: 卓中央（場札・捨て札エリア）に落ちる暖色の光だまり。
+/* update11: 3点の間隔を広げ、卓の中景（モックの場の位置）に寄せて下げる。
+   perspective は山札・捨て札を「卓に寝かせて置いた物」に見せるための遠近 */
+#table-center{display:flex;align-items:center;gap:clamp(22px,4vw,54px);justify-content:center;z-index:2;
+  margin-top:clamp(20px,7vh,76px);perspective:700px}
+/* 天井ランプの光（update5・本人指示／update7で強化）: 卓中央（場札・捨て札エリア）に落ちる暖色の光だまり。
+   update7: 実機で「照らされている雰囲気がなかった」ため、光だまり自体の濃さ（中心 .38／中間 .18）と
+   広さ（山札・場札・捨て札を含む中央エリア）を上げた。画面全体を暗くはしない（光の外は従来の明るさ）。
    吊りランプが微かに揺れている想定で、光量は一定のまま位置だけが長周期・小振幅で揺れる（明滅なし）。
    場札の発光（fxFlash）とは役割が別（こちらは卓の常設の灯り）で、色味はバーのオレンジ光に合わせる。
    transform のみで動かし、操作は通す（pointer-events:none） */
 #table-wrap::before{content:"";position:absolute;left:50%;top:50%;z-index:1;pointer-events:none;border-radius:50%;
-  width:min(80vmin,580px);height:min(58vmin,410px);
-  background:radial-gradient(ellipse at center, rgba(255,196,110,.20) 0%, rgba(255,170,80,.10) 45%, rgba(255,160,70,0) 70%);
+  width:min(98vmin,760px);height:min(72vmin,520px);
+  background:radial-gradient(ellipse at center, rgba(255,196,110,.38) 0%, rgba(255,170,80,.18) 45%, rgba(255,160,70,0) 70%);
   animation:lampSway 9s ease-in-out infinite alternate;will-change:transform}
 @keyframes lampSway{from{transform:translate(calc(-50% - 5px),calc(-50% - 2px)) rotate(-.5deg)}to{transform:translate(calc(-50% + 5px),calc(-50% + 2px)) rotate(.5deg)}}
 .pile{display:flex;flex-direction:column;align-items:center;gap:5px}
 .pile-label{font-size:11px;color:#f0dfba;text-shadow:0 1px 3px rgba(0,0,0,.8);white-space:nowrap}
-.pile-stack{width:46px;height:65px;border-radius:5px;
+.pile-stack{width:56px;height:79px;border-radius:5px;
   background:url("card-back.webp") center / cover no-repeat;
-  box-shadow:2px 2px 0 #2a2018, 3px 3px 0 #0e0b08, 5px 5px 0 #2a2018, 6px 6px 0 #0e0b08, 8px 8px 10px rgba(0,0,0,.55)}
+  box-shadow:2px 2px 0 #2a2018, 3px 3px 0 #0e0b08, 5px 5px 0 #2a2018, 6px 6px 0 #0e0b08, 8px 8px 10px rgba(0,0,0,.55);
+  transform:rotateX(48deg) rotateZ(-5deg);transform-origin:50% 82%}
 #discard-pile{cursor:pointer}
-#discard-top .mini-card{transform:rotate(-4deg);box-shadow:2px 2px 0 rgba(20,10,0,.55), 4px 4px 0 rgba(90,60,25,.8), 5px 5px 8px rgba(0,0,0,.5)}
-#discard-top:empty::after{content:"";display:block;width:34px;height:50px;border:1.5px dashed rgba(240,223,186,.4);border-radius:4px}
+#discard-top .mini-card{width:42px;height:60px;font-size:16px;transform:rotateX(46deg) rotateZ(6deg);transform-origin:50% 82%;box-shadow:2px 2px 0 rgba(20,10,0,.55), 4px 4px 0 rgba(90,60,25,.8), 5px 5px 8px rgba(0,0,0,.5)}
+#discard-top:empty::after{content:"";display:block;width:42px;height:60px;border:1.5px dashed rgba(240,223,186,.4);border-radius:4px}
 #field-info{font-size:13px;color:#f6ecd2;max-width:170px;text-shadow:0 1px 3px rgba(0,0,0,.85)}
 #field-info .win{color:#ffd968;font-weight:700}
 
-#banner{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);z-index:6;white-space:nowrap;
+#banner{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);z-index:6;pointer-events:none;white-space:nowrap;
   padding:8px 18px;border-radius:10px;background:rgba(61,44,5,.92);border:1px solid var(--gold);color:#ffe9a8;font-weight:700;text-align:center;font-size:15px}
 #banner.dobon{background:rgba(61,13,18,.94);border-color:var(--red);color:#ffb3ba}
 
 /* 効果発動バナー（場の上部に大きく出す。何が起きたか一目で分かること優先） */
-#fx-banner{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:8;white-space:nowrap;
+#fx-banner{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:8;pointer-events:none;white-space:nowrap;
   padding:10px 22px;border-radius:12px;background:rgba(24,10,2,.94);border:2px solid var(--gold);
   color:#ffe9a8;font-weight:800;text-align:center;font-size:17px;box-shadow:0 6px 22px rgba(0,0,0,.6);
   animation:fxPop .25s ease both}
@@ -133,18 +171,29 @@ button:disabled{opacity:.4;cursor:default}
 .hand-head{display:flex;align-items:center;gap:8px}
 .hand-head #hand-totals{flex:1;margin:2px 0 4px;text-align:left}
 .hand-head #btn-sort{flex:0 0 auto}
+/* update11: 手札合計はモックの黄色チップとして見せる */
 #hand-totals{font-size:14px;color:#f0e6cc}
+.hand-head #hand-totals{flex:0 1 auto;background:linear-gradient(180deg,#d9a92c,#b9861c);color:#2a1d05;
+  padding:3px 12px;border-radius:8px;font-weight:700;box-shadow:0 2px 6px rgba(0,0,0,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #hand-totals b{color:var(--gold)}
+.hand-head #hand-totals b{color:#6d4d00}
 /* 自分の札束の山: 手札の直下 */
 #my-bundles{margin:0 0 4px;min-height:24px}
 #my-bundles .bundles{margin-top:0}
 
 /* --- 最下部バー: アクションボタン＋ドボン --- */
-#bottom-bar{display:flex;gap:8px;align-items:stretch;padding:6px 10px calc(8px + env(safe-area-inset-bottom));background:rgba(10,4,0,.5)}
+/* update11: 最下部はモックの暗紺の帯＋面取りボタンに寄せる */
+#bottom-bar{display:flex;gap:8px;align-items:stretch;padding:7px 10px calc(9px + env(safe-area-inset-bottom));
+  background:linear-gradient(180deg,#151b26,#090d13);border-top:2px solid #2e3947}
 #action-area{flex:1;display:flex;gap:8px;flex-wrap:wrap;min-height:46px}
-#action-area button{flex:1;padding:10px;font-size:15px;white-space:nowrap}
+#action-area button{flex:1;padding:10px;font-size:15px;white-space:nowrap;font-weight:800;
+  border:2px solid #5a6572;border-radius:4px;
+  background:linear-gradient(180deg,#3b444f,#21272f);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.16), 0 3px 8px rgba(0,0,0,.45);
+  clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px)}
 #action-area .choice-btn{flex:1}
-.dobon-btn{flex:1 1 148px;padding:10px;font-size:20px;font-weight:800;letter-spacing:.2em;background:#2a2c33;border:2px solid #555;color:#888}
+.dobon-btn{flex:1 1 148px;padding:10px;font-size:20px;font-weight:800;letter-spacing:.2em;background:#2a2c33;border:2px solid #555;color:#888;
+  clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px)}
 .dobon-btn.ready{background:linear-gradient(180deg,#c1121f,#780000);border-color:#ff5964;color:#fff;animation:pulse 1.6s ease-in-out infinite alternate}
 @keyframes pulse{from{box-shadow:0 0 0 rgba(224,27,47,0)}to{box-shadow:0 0 16px rgba(200,20,35,.6)}}
 #host-tools{padding:0 10px 8px;display:flex;gap:8px;background:rgba(10,4,0,.5)}
@@ -152,6 +201,16 @@ button:disabled{opacity:.4;cursor:default}
 /* --- 札束トークン（駒）: 紙幣の縦横比 約2.35:1、側面の層で厚みを表現 --- */
 .bundles{position:relative;height:30px;margin-top:4px;cursor:pointer}
 .bundle{position:absolute;width:44px;height:19px}
+/* update11: 札束の山をモックの「卓に置いた山」の大きさへ。相手は山の幅を持たせて広げ、
+   自分はトークンをひと回り大きくする（置き場所は従来どおり） */
+.opp .bundles{width:132px;height:42px}
+.opp .bundle{width:58px;height:25px}
+.opp .bundle::before{height:16px}
+.opp .bundle::after{top:16px;height:9px}
+#my-bundles .bundles{height:38px}
+#my-bundles .bundle{width:54px;height:23px}
+#my-bundles .bundle::before{height:15px}
+#my-bundles .bundle::after{top:15px;height:8px}
 /* 【仮実装・差し替え口】札束トークンの上面: 承認済みデザイン画像が来たら --bundle-layer を url(...) に置き換える */
 :root{--bundle-layer:linear-gradient(rgba(0,0,0,0), rgba(0,0,0,0))}
 .bundle::before{content:"";position:absolute;left:0;right:0;top:0;height:12px;border-radius:2px 2px 0 0;
@@ -174,7 +233,7 @@ button:disabled{opacity:.4;cursor:default}
 /* ============================================================
    手札（ファン状に重ね、数字+矢印が必ず見える）
    ============================================================ */
-#hand{display:flex;gap:0;overflow-x:auto;overflow-y:hidden;padding:8px 2px 4px;min-height:104px;align-items:center;scrollbar-width:none}
+#hand{display:flex;gap:0;overflow-x:auto;overflow-y:hidden;padding:10px 2px 4px;min-height:122px;align-items:center;scrollbar-width:none}
 #hand::-webkit-scrollbar{display:none}
 #hand.sorting{outline:1px dashed var(--gold);outline-offset:2px;border-radius:8px}
 #hand.sorting .card{touch-action:none;cursor:grab}
@@ -189,7 +248,7 @@ button:disabled{opacity:.4;cursor:default}
 .card.suit-W{background:#e9e4d8;color:#191919;border-color:#999}
 .card.suit-B{background:#17181d;color:#f2f2f2;border-color:#555}
 .card.gold-frame{border-color:var(--gold)}
-.card .art{position:absolute;inset:0;background-size:cover;background-position:center;opacity:.92}
+.card .art{position:absolute;inset:0;background-size:contain;background-repeat:no-repeat;background-position:center;opacity:.98}
 .card .art-none{position:absolute;inset:22px 0 30px;display:flex;align-items:center;justify-content:center;font-size:40px;font-weight:900;opacity:.16}
 /* 左上クラスタ: 数字+矢印+スートをひと塊で */
 .card .idx{position:absolute;top:2px;left:4px;z-index:3;display:flex;align-items:flex-start;gap:2px;font-weight:900;font-size:19px;line-height:1;text-shadow:0 1px 3px rgba(0,0,0,.7)}
@@ -222,7 +281,7 @@ button:disabled{opacity:.4;cursor:default}
 .card.suit-W .flavor{background:rgba(240,236,226,.85);color:#333}
 .card.gold-line .flavor{border-top:1.5px solid var(--gold)}
 .card.draw5-mark{outline:2px solid var(--red);outline-offset:-4px}
-.card.big{--card-w:112px;--flavor-h:26px}
+.card.big{--card-w:clamp(144px,11.5vw,176px);--flavor-h:26px} /* update11: 場カードは画面幅に連動してモックの存在感へ（下限144pxは従来どおり） */
 .card.big .idx{font-size:29px}
 .card.big .idx .arrow{font-size:19px}
 .card.big .idx .suit-dot{width:14px;height:14px;margin-top:5px}
@@ -237,6 +296,8 @@ button:disabled{opacity:.4;cursor:default}
 .card.modal-card .score-badge .bnum{font-size:29px}
 .card.modal-card .flavor{font-size:12.5px}
 #hand .card{cursor:pointer;transition:transform .12s, filter .12s}
+/* update11: 自分の手札も扇にする。角度と上下は layoutHand が --fan-rot / --fan-y で付ける */
+#hand .card{transform:rotate(var(--fan-rot,0deg)) translateY(var(--fan-y,0px));transform-origin:50% 94%}
 #hand .card.playable{filter:brightness(1.12)}
 #hand .card.unplayable{filter:brightness(.55) saturate(.6)}
 #hand .card.noassist{filter:none}
@@ -301,13 +362,24 @@ button:disabled{opacity:.4;cursor:default}
 #spotlight .spot-backs figure{margin:0;text-align:center}
 #spotlight .spot-backs img{width:min(24vw,100px);border-radius:6px;border:1px solid #6b6250;box-shadow:0 6px 14px rgba(0,0,0,.5)}
 #spotlight .spot-backs figcaption{font-size:11px;color:#e8dcc4;text-shadow:0 1px 3px #000;margin-top:2px}
-/* 出たカードの大写し（全員表示） */
-#played-overlay{position:fixed;inset:0;z-index:44;display:flex;align-items:center;justify-content:center;pointer-events:none}
-#played-overlay .card{flex:0 0 auto;box-shadow:0 18px 44px rgba(0,0,0,.7)}
-/* 場へ飛ぶカード */
+/* 出たカードの演出（update8）: 専用オーバーレイは廃止し、ゴースト自体が中央で大写しになる。
+   アニメーションの間は場の実カードを隠し、着地の瞬間に切り替える（ゴーストと二重に見せない） */
+#field-card.fx-hide .card{visibility:hidden}
+/* 出すアニメーションのゴースト（手札→中央で大写し→場へ） */
 .fly-card{position:fixed;z-index:47;pointer-events:none;will-change:transform;box-shadow:0 10px 22px rgba(0,0,0,.55)}
-/* 24の全体像アート（切り抜かず絵全体を見せる） */
-.card .art.full{background-size:contain;background-repeat:no-repeat;background-color:#0b0d12}
+/* フリップ（update8追加）: 出す演出のゴーストと、11公開のミニ表示で使う裏→表の反転 */
+.play-ghost{perspective:1000px;box-shadow:none}
+.flip-inner{position:relative;width:100%;height:100%;transform-style:preserve-3d}
+.flip-face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.flip-front{transform:rotateY(180deg);box-shadow:0 10px 22px rgba(0,0,0,.55)}
+.flip-back{background:url("card-back.webp") center / cover no-repeat;border-radius:7px;box-shadow:0 10px 22px rgba(0,0,0,.55)}
+.open-flip{width:34px;height:50px;flex:0 0 auto;perspective:400px;cursor:pointer}
+.open-flip-inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;animation:openFlip .35s ease both}
+.open-flip .mini-card{width:100%;height:100%}
+.open-flip-back{background:url("card-back-s.webp") center / cover no-repeat;border-radius:4px;border:1.5px solid #777}
+@keyframes openFlip{from{transform:rotateY(0deg)}to{transform:rotateY(180deg)}}
+/* 全体像アート（update7: 全カード共通。切り取らず絵全体を収め、余白はカードの地色で吸収する） */
+.card .art.full{background-size:contain;background-repeat:no-repeat}
 /* 後継者の証・庇護の証のアイコン */
 .marker-img{width:17px;height:17px;border-radius:50%;vertical-align:-3px;border:1px solid rgba(201,162,39,.75);background:#14100a}
 .chip-img{width:15px;height:15px;border-radius:50%;vertical-align:-2px;margin-right:3px;border:1px solid rgba(201,162,39,.5)}
@@ -328,7 +400,7 @@ button:disabled{opacity:.4;cursor:default}
 #turn-banner{margin:2px 0 4px;padding:7px 12px;border-radius:9px;font-size:15px;font-weight:800;letter-spacing:.08em;
   background:rgba(12,10,8,.92);border:1px solid var(--gold);border-left:6px solid var(--pc-self,#f2c230);color:var(--paper)}
 /* エラー帯（alert廃止の受け皿） */
-#error-band{position:absolute;top:34px;left:50%;transform:translateX(-50%);z-index:40;max-width:92vw;
+#error-band{position:absolute;top:34px;left:50%;transform:translateX(-50%);z-index:40;pointer-events:none;max-width:92vw;
   padding:7px 16px;border-radius:9px;background:rgba(61,13,18,.94);border:1px solid #ff5964;color:#ffd7da;
   font-size:13.5px;font-weight:700;text-align:center;box-shadow:0 6px 18px rgba(0,0,0,.55)}
 /* 山札の光: 自分の番で未ドローの間だけ弱く明滅する（大きさは変えない） */
@@ -353,13 +425,13 @@ button:disabled{opacity:.4;cursor:default}
 @keyframes dobonFlash{0%,100%{filter:brightness(1)}50%{filter:brightness(1.6)}}
 .dobon-btn.flash{animation:dobonFlash .3s ease 3}
 /* 出せるカード: 自分の色の枠＋呼吸（位置の微かな上下動のみ。拡大縮小はしない） */
-@keyframes breathe{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes breathe{0%,100%{transform:rotate(var(--fan-rot,0deg)) translateY(var(--fan-y,0px))}50%{transform:rotate(var(--fan-rot,0deg)) translateY(calc(var(--fan-y,0px) - 3px))}}
 #hand .card.playable{outline:2px solid var(--pc-self,#f2c230);animation:breathe 1.6s ease-in-out infinite}
 #hand .card.selected{animation:none}
 /* 公開中カードの目印（自分の手札） */
 #hand .card.is-open{outline:1.5px solid var(--gold);outline-offset:-1px}
 .card .open-badge{position:absolute;top:2px;right:3px;z-index:5;font-size:11px;line-height:1;
-  background:rgba(10,10,12,.78);border:1px solid var(--gold);border-radius:6px;padding:1.5px 3px}
+  background:rgba(10,10,12,.78);border:1px solid var(--gold);border-radius:6px;padding:1.5px 3px} /* 旧・自分の手札の👁バッジ（update10で .eye-mark に置換。ルールは互換のため残置） */
 /* 公開ミニカードの区別: 両面24=df（真鍮の二重枠）／11の公開=open（目の印） */
 .mini-card.df{border-color:#b08d3c;box-shadow:0 0 0 1.5px #b08d3c inset, 0 0 7px rgba(201,162,39,.5)}
 .mini-card.open::after{content:"👁";position:absolute;top:-7px;right:-6px;font-size:10px;background:rgba(10,10,12,.85);border:1px solid var(--gold);border-radius:50%;padding:1px 2px}
@@ -389,4 +461,38 @@ button:disabled{opacity:.4;cursor:default}
   #spotlight .card-modal-fx p{font-size:12px;line-height:1.45}
   #spotlight .spot-backs img{width:min(15vw,64px)}
   #spotlight .spot-note{font-size:11.5px}
+  /* 低丈横画面モード（update7）: スポットライトだけでなくゲーム画面全体を圧縮し、
+     740x360 / 915x412 でも 場・手札・アクションボタンが画面内に収まってタップできるようにする。
+     サイズ階層（場カード > 自分の手札 > 相手の裏面）は圧縮後も維持する */
+  #topbar{padding:3px 8px;font-size:11.5px;gap:6px}
+  #topbar button.mini{padding:3px 7px;font-size:11px}
+  #my-area{padding:0 8px}
+  #my-status{font-size:11px;margin:1px 0;min-height:1.1em}
+  #turn-banner{font-size:12.5px;padding:4px 10px;margin:1px 0 2px}
+  .hand-head #hand-totals{font-size:12px;margin:1px 0 2px}
+  #hand{--card-w:12.5vmin;min-height:0;padding:5px 2px 3px}
+  #field-card .card.big{--card-w:min(132px,25vmin)}
+  #my-bundles{min-height:18px;margin:0 0 2px}
+  #bottom-bar{padding:4px 8px calc(5px + env(safe-area-inset-bottom))}
+  #action-area{min-height:38px}
+  #action-area button{padding:6px;font-size:13.5px}
+  .dobon-btn{font-size:17px;padding:6px}
+  #host-tools{padding:0 8px 5px}
+  .seat{gap:5px}
+  .opp{gap:1px;max-width:230px}
+  .opp .nm{font-size:11px;padding:1px 8px}
+  .opp .meta{font-size:10px}
+  .opp-backs{min-height:42px;margin-top:2px;padding-top:2px}
+  .opp-backs .card-back{width:26px;height:37px}
+  .opp-backs .card-back + .card-back{margin-left:-14px}
+  .opp .bundles{width:104px;height:34px}
+  #my-bundles .bundles{height:30px}
+  #table-center{gap:10px;margin-top:10px}
+  .pile-stack{width:44px;height:62px}
+  #discard-top .mini-card{width:34px;height:50px;font-size:13px}
+  .pile-label{font-size:10px}
+  #field-info{font-size:11.5px;max-width:132px}
+  #banner{padding:5px 12px;font-size:13px;bottom:4px}
+  #fx-banner{padding:6px 14px;font-size:14px;top:6px}
+  #my-warning{padding:4px 9px;font-size:12px;margin:1px 0 2px}
 }

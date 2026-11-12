@@ -104,9 +104,12 @@ function connect() {
       S = m.state;
       if (S.lastEvent && S.lastEvent.seq !== lastEventSeq) {
         if (lastEventSeq >= 0) {
-          playEventSound(S.lastEvent); onFxEvent(S.lastEvent);
-          // 場に出たカードの演出（render前のDOM=手札/裏面列の位置から飛ばすため、ここで処理する）
-          if (S.lastEvent.kind === 'play') onPlayEvent(S.lastEvent);
+          // 演出系の例外で render() まで止まらないよう隔離する（update7）
+          try {
+            playEventSound(S.lastEvent); onFxEvent(S.lastEvent);
+            // 場に出たカードの演出（render前のDOM=手札/裏面列の位置から飛ばすため、ここで処理する）
+            if (S.lastEvent.kind === 'play') onPlayEvent(S.lastEvent);
+          } catch {}
         }
         lastEventSeq = S.lastEvent.seq;
       }
@@ -165,31 +168,32 @@ function applyTouchLift(playerId) {
 }
 
 // ---------- カード描画（情報レイヤー） ----------
-// イラストは承認サンプルの「中央イラスト帯だけ」を切り出した band 画像を使う。
-// サンプル全面には数字・バッジ・効果アイコンが印刷されており、そのまま使うと
-// 情報レイヤーと二重描画になるため（2026-11-11 大改修）。元画像は見本表示用に残置。
+// イラストは「丸ごと」アセット（*-full.webp）を使う（update7・本人指示）。
+// 旧 band 画像（横長の帯を cover で被せる方式）は、表示時に被写体の左右が大きく
+// 切り取られる（切り取りの二重掛け）ため廃止した。新アセットは原画全体のリサイズ、
+// または承認サンプルのイラスト窓を縦長キャンバスに敷いたもので、表示側は
+// contain で切り取らずに収める。band ファイル自体は残置するが、もう参照しない。
 // アートパスはこのブロックに集約する（flat変換ではプレフィックス AP の値だけが変わる）
 const AP = '';
 const ART = {
-  0: AP + '0-band.webp', 1: AP + '1-band.webp', 2: AP + '2-band.webp', 3: AP + '3-band.webp',
-  4: AP + '4-band.webp', 5: AP + '5-band.webp', 6: AP + '6-band.webp', 7: AP + '7-band.webp',
-  8: AP + '8-band.webp', 9: AP + '9-band.webp', 10: AP + '10-band.webp', 11: AP + '11-band.webp',
-  12: AP + '12-band.webp', 24: AP + '24-band.webp',
+  0: AP + '0-full.webp', 1: AP + '1-full.webp', 2: AP + '2-full.webp', 3: AP + '3-full.webp',
+  4: AP + '4-full.webp', 5: AP + '5-full.webp', 6: AP + '6-full.webp', 7: AP + '7-full.webp',
+  8: AP + '8-full.webp', 9: AP + '9-full.webp', 10: AP + '10-full.webp', 11: AP + '11-full.webp',
+  12: AP + '12-full.webp', 24: AP + '24-casino.webp', // 24の既定はカジノ全体像（バリアント優先）
 };
-const ART_DRAW5 = AP + '1-draw5-band.webp'; // ドロー5黒1専用（密書。通常の1=共同水道とは別絵で管理）
+const ART_DRAW5 = AP + '1-draw5-full.webp'; // ドロー5黒1専用（密書。通常の1=共同水道とは別絵で管理）
 const ART24 = { // 24の絵柄バリアント（表示専用）。全体像を切り抜かずに見せる
   casino: AP + '24-casino.webp', tower: AP + '24-tower.webp',
   hq: AP + '24-hq.webp', hqBack: AP + '24-hq-back.webp', // 本部: 表=真昼／裏=夕景
 };
 const MARKER_IMG = AP + 'marker-ring.webp'; // 後継者の証（紋章の印章指輪）
 const CHIP_IMG = { front: AP + 'chip-front.webp', back: AP + 'chip-back.webp' }; // 庇護の証 表／裏（死）
-// cover 表示時の主役の横位置（帯画像内で被写体が中央に無いものだけ調整）
-const ART_POS = { 0: '50%', 2: '38%', 7: '50%', 11: '34%', 24: '50%' };
-// カード→表示アートの解決（24はバリアントで全面寄り表示、それ以外は中央バンド）
+const EYE_IMG = AP + 'eye-mark.webp'; // 11で公開中の目印: 横長楕円に金の目（本人指定デザイン、update10）。カードの上辺の中央に、下半分だけ重ねて置く
+// カード→表示アートの解決（全て「全体像を切り取らずに収める」full 表示。24はバリアント優先）
 function artFor(card) {
-  if (card.draw5) return { src: ART_DRAW5, full: false };
+  if (card.draw5) return { src: ART_DRAW5, full: true };
   if (card.num === 24 && card.art && ART24[card.art]) return { src: ART24[card.art], full: true };
-  return { src: ART[card.num] || null, full: false };
+  return { src: ART[card.num] || null, full: true };
 }
 const FLAVOR = {
   0: 'ここでは、銃も金も、静かに眠る。', 1: '路地の奥に、最初の取引。', 2: 'その荷、次はお前が持て。',
@@ -222,7 +226,7 @@ function effectInfo(card) {
   if (card.num === 0 || card.num === 24) return { name: 'オールマイティ／スート変更', text: 'いつでも出せる。出したら、次のスート（白か黒）を自分で決める。' };
   if (card.num === 2) return { name: 'ドロー2', text: '次の者が2枚引く。2を出せば累積して次へ引き継げる（累積は増えていく）。' };
   if (card.num === 7) return { name: '方向指定', text: '出したら、次の方向（↑以上／↓以下）を自分で決める。' };
-  if (card.num === 11) return { name: '公開（目）', text: '次の者は、自分のいちばん大きいカード1枚を全員に公開する。11を出せば累積する。' };
+  if (card.num === 11) return { name: '公開（目）', text: '次の者は、自分のいちばん大きいカードを全員に公開して、手番を終える。公開したカードは手札にある間ずっと全員に見えていて、それを場に出す時は表のまま出る。11を出せば累積して次へ回せる。' };
   return null;
 }
 function bundleSVG() {
@@ -242,12 +246,12 @@ function bundleSVG() {
 function cardEl(card, opts = {}) {
   const d = document.createElement('div');
   const special = card.num === 0 || card.num === 24;
-  d.className = 'card' + (special ? ' gold-frame gold-line' : (card.suit === 'W' ? ' suit-W' : ' suit-B')) + (opts.big ? ' big' : '');
+  d.className = 'card' + (special ? ' gold-frame gold-line' : (card.suit === 'W' ? ' suit-W' : ' suit-B')) + (opts.big ? ' big' : '') + (opts.modal ? ' modal-card' : '');
   const a = artFor(card);
   const art = a.src;
   const flavor = card.draw5 ? '触れるな。ここは最奥だ。' : (FLAVOR[card.num] || '');
   d.innerHTML = `
-    ${art ? `<div class="art${a.full ? ' full' : ''}" style="background-image:url(${art});background-position:${ART_POS[card.num] || '50%'} 50%"></div>` : `<div class="art-none">${card.num}</div>`}
+    ${art ? `<div class="art${a.full ? ' full' : ''}" style="background-image:url(${art})"></div>` : `<div class="art-none">${card.num}</div>`}
     <div class="idx"><span class="num">${card.num}</span><span class="arrow">${card.arrow === 'up' ? '↑' : '↓'}</span>${special ? '' : '<span class="suit-dot"></span>'}</div>
     <div class="score-badge">${bundleSVG()}<span class="bnum">${card.pts}</span></div>
     ${card.draw5 ? '<div style="position:absolute;inset:3px;border:2px solid #a31621;border-radius:5px;pointer-events:none;z-index:2"></div>' : ''}
@@ -276,6 +280,45 @@ function miniCard(card, open) {
   if (card.df) d.title = '両面表の24（所在は全員に見えている）';
   else if (open) d.title = '11で公開中のカード';
   return d;
+}
+// 11の効果で公開された「相手の」カードの表示（update8追加）: 新規公開時は裏→表フリップで現れる。
+// 再描画でアニメーションが途切れないよう開始時刻を保持し、delay を実時間に同期させる。
+// 累積で複数枚が同時に公開された場合は 140ms ずつずらして順に返る。
+// 両面表の24（df）は元々全員に見えているのでフリップ対象外。公開した本人の手札表示には付けない。
+const openFlipAt = new Map(); // `${round}:${cardId}` -> 開始予定時刻(ms)
+const openSeen = new Set();   // フリップを見届けた公開カード
+let openFlipSeqBase = 0;
+function openCardEl(c) {
+  if (!c.df) {
+    const key = `${S ? S.round : '?'}:${c.id}`;
+    const now = Date.now();
+    if (!openSeen.has(key) && !openFlipAt.has(key)) {
+      const base = Math.max(now, openFlipSeqBase);
+      openFlipAt.set(key, base);
+      openFlipSeqBase = base + 140;
+    }
+    const start = openFlipAt.get(key);
+    if (start != null) {
+      if (now - start < 350) {
+        const wrap = document.createElement('div');
+        wrap.className = 'open-flip';
+        const inner = document.createElement('div');
+        inner.className = 'open-flip-inner';
+        inner.style.animationDelay = (start - now) + 'ms';
+        const back = document.createElement('div');
+        back.className = 'flip-face open-flip-back';
+        const front = miniCard(c, true);
+        front.classList.add('flip-face', 'flip-front');
+        inner.appendChild(back);
+        inner.appendChild(front);
+        wrap.appendChild(inner);
+        return wrap;
+      }
+      openFlipAt.delete(key);
+      openSeen.add(key);
+    }
+  }
+  return miniCard(c, true);
 }
 // 札束の山（決定的な疑似ランダムで雑に積む）
 function bundlesEl(player, isMe) {
@@ -383,6 +426,7 @@ function renderGame() {
   opps.forEach((p, i) => {
     const d = document.createElement('div');
     const pc = pcolor(p);
+    const slot = slotFor(i, opps.length);
     d.className = 'opp' + (S.currentId === p.id && (S.phase === 'turn') ? ' active' : '');
     d.style.setProperty('--pc', pc.css); // 手番枠・触れている裏面の縁取りはそのプレイヤーの色
     let chipHtml = '';
@@ -395,23 +439,49 @@ function renderGame() {
     if (p.openCards.length) {
       const oc = document.createElement('div'); oc.className = 'open-cards';
       for (const c of p.openCards) {
-        const mc = miniCard(c, true);
+        const mc = openCardEl(c); // 新規公開時は裏→表フリップで現れる（update8追加）
         mc.onclick = () => showInfoCard(c);
         oc.appendChild(mc);
       }
       d.appendChild(oc);
     }
     // 裏向きカード列（裏面は全て同一デザイン。並び替え時はこの列が揺れる）
+    // update10: 11で公開中の位置（openSlots）だけは裏面ではなく実際の表面（小型）で出し、
+    // その上辺の中央に目アイコンを重ねる（中心が上辺に一致＝下半分だけカードに重なる）
     const backs = document.createElement('div');
     backs.className = 'opp-backs'; backs.dataset.pid = p.id;
+    const slotByIdx = new Map((p.openSlots || []).map((s) => [s.i, s.card]));
     for (let j = 0; j < p.handCount; j++) {
-      const b = document.createElement('div'); b.className = 'card-back';
+      const slotCard = slotByIdx.get(j);
+      if (!slotCard) {
+        const b = document.createElement('div'); b.className = 'card-back';
+        backs.appendChild(b);
+        continue;
+      }
+      const b = document.createElement('div');
+      b.className = 'card-back fan-open' + (slotCard.suit === 'W' ? ' w' : '');
+      b.title = '11で公開中のカード';
+      const num = document.createElement('span');
+      num.className = 'fan-num';
+      num.textContent = `${slotCard.num}${slotCard.arrow === 'up' ? '↑' : '↓'}`;
+      b.appendChild(num);
+      const eye = document.createElement('img');
+      eye.className = 'eye-mark'; eye.src = EYE_IMG; eye.alt = '';
+      b.appendChild(eye);
+      b.onclick = () => showInfoCard(slotCard);
       backs.appendChild(b);
     }
+    // update11: 扇の弧（席と位置に応じた連続した回転＋上下の丸み）を付ける
+    const nB = backs.children.length, midB = (nB - 1) / 2;
+    [...backs.children].forEach((el, j) => {
+      const dd = j - midB;
+      el.style.setProperty('--fan-rot', (dd * (slot === 'top' ? 4.4 : 3.4)).toFixed(2) + 'deg');
+      el.style.setProperty('--fan-y', (Math.abs(dd) * (slot === 'top' ? 2.4 : 2.0)).toFixed(1) + 'px');
+    });
     d.appendChild(backs);
     applyTouchLift(p.id); // 「触れている1枚」の持ち上げを再描画後も維持する
     d.appendChild(bundlesEl(p));
-    seats[slotFor(i, opps.length)].appendChild(d);
+    seats[slot].appendChild(d);
   });
   // 自分の札束と状態
   const me = S.players.find((p) => p.id === myId);
@@ -456,6 +526,14 @@ function renderGame() {
   if (S.fieldTop) {
     const fel = cardEl(S.fieldTop, { big: true });
     if (Date.now() < fxFlashUntil) fel.classList.add('fx-flash');
+    // 出されたカードの発光（update9・本人指定）: 外縁を出したプレイヤーの色で細く光らせる。
+    // 手番が終わったら（受付・返し・効果の解決が済んで次の手番に移ったら）消える
+    if (playedGlow && playedGlow.cardId === S.fieldTop.id
+      && (S.phase === 'dobonWindow' || S.phase === 'dobonExtra' || S.phase === 'kaeshi' || S.phase === 'fxWait')) {
+      const gp = S.players.find((p) => p.id === playedGlow.playerId);
+      const gc = pcolor(gp).css;
+      fel.style.boxShadow = `0 0 0 2px ${gc}, 0 0 14px ${gc}`;
+    }
     fel.onclick = () => showInfoCard(S.fieldTop);
     fc.appendChild(fel);
   }
@@ -487,6 +565,12 @@ function renderGame() {
   renderBanner();
   renderActions();
   renderHand();
+  // 出すアニメーションのフォールバック（update7）: 一次経路（lastEvent差分）を
+  // 取りこぼしても、ドボン受付中に場札が新しいカードなら描画済みDOMを起点に同じ
+  // 演出を発火させる。発火済みの同一カードは firePlayFx の dedupe で二重発火しない
+  if (S.window && S.fieldTop && (S.phase === 'dobonWindow' || S.phase === 'dobonExtra')) {
+    try { firePlayFx(S.window.playedBy, S.fieldTop); } catch {}
+  }
   // ドボンボタン
   const db = $('btn-dobon');
   const canD = S.window && S.window.canDobon;
@@ -557,7 +641,8 @@ function renderActions() {
   if (S.pendingDraw > 0) { add(`ドロー${S.pendingDraw}枚を引く`, () => send({ t: 'drawPending' })); a.insertAdjacentHTML('beforeend', '<span class="hint" style="align-self:center">2を出せば累積して次へ</span>'); return; }
   if (S.pendingReveal > 0) { add(`最大のカード${S.pendingReveal}枚を公開する`, () => send({ t: 'reveal' })); a.insertAdjacentHTML('beforeend', '<span class="hint" style="align-self:center">11を出せば累積して次へ</span>'); return; }
   if (!S.me.drewThisTurn && !S.mustNagashi) add('山札から1枚引く', () => send({ t: 'draw' }));
-  if (!S.mustNagashi) add('パス', () => send({ t: 'pass' }));
+  if (!S.mustNagashi && S.me.drewThisTurn) add('パス', () => send({ t: 'pass' }));
+  if (!S.mustNagashi && !S.me.drewThisTurn) a.insertAdjacentHTML('beforeend', '<span class="hint" style="align-self:center">パスは山札を引いた後で選べる</span>');
   if (S.mustNagashi) a.insertAdjacentHTML('beforeend', '<span class="hint" style="align-self:center">場流し: 好きなカードを1枚出せ</span>');
 }
 
@@ -586,11 +671,12 @@ function renderHand() {
     if (assist && S.me.isMyTurn) el.classList.add(playable.has(c.id) ? 'playable' : 'unplayable');
     if (!assist) el.classList.add('noassist');
     if (S.window && S.window.myReservation === c.id) el.classList.add('reserved');
-    if (c.open) { // 11で公開中の自分のカードには残り続ける目印（update4）
+    if (c.open) { // 11で公開中の自分のカード: 上辺の中央に目アイコンを重ねる（update10。旧・右上の👁バッジから差し替え）
       el.classList.add('is-open');
-      const bd = document.createElement('div');
-      bd.className = 'open-badge'; bd.textContent = '👁'; bd.title = 'このカードは全員に公開中';
-      el.appendChild(bd);
+      const eye = document.createElement('img');
+      eye.className = 'eye-mark'; eye.src = EYE_IMG; eye.alt = '';
+      eye.title = 'このカードは全員に公開中';
+      el.appendChild(eye);
     }
     el.onclick = () => onTapCard(c);
     h.appendChild(el);
@@ -617,13 +703,20 @@ function layoutHand() {
   const h = $('hand');
   const els = [...h.querySelectorAll('.card')];
   for (const el of els) el.style.marginLeft = '';
+  // update11: 自分の手札にも扇の角度（位置に応じた回転＋上下の丸み）を付ける
+  const midH = (els.length - 1) / 2;
+  els.forEach((el, i) => {
+    const dd = i - midH;
+    el.style.setProperty('--fan-rot', (dd * 2.4).toFixed(2) + 'deg');
+    el.style.setProperty('--fan-y', (Math.abs(dd) * 1.9).toFixed(1) + 'px');
+  });
   if (els.length < 2) return;
   const cw = els[0].offsetWidth;
   if (!cw) return;
   const avail = h.clientWidth - 6;
   const total = cw * els.length;
   if (total <= avail) return;
-  const overlap = Math.min((total - avail) / (els.length - 1), cw - 42); // 最低42px（数字+矢印の幅）は見せる
+  const overlap = Math.min((total - avail) / (els.length - 1), cw - 46); // 最低46px（数字+矢印の幅）は見せる
   if (overlap <= 0) return;
   for (let i = 1; i < els.length; i++) els[i].style.marginLeft = (-overlap).toFixed(1) + 'px';
 }
@@ -869,94 +962,174 @@ function renderSpotlight() {
   el.classList.remove('hidden');
 }
 
-// ---------- 出たカードの演出 ----------
-// (1) 場へ飛ぶアニメーション: transform/opacityのみ・0.55秒。
-//     横の席（左/右）は1種類の動きを反転して共用し、正面の席は別の動きにする
-function flyKeyframes(kind, dx, dy, s1) {
-  if (kind === 'left' || kind === 'right') {
-    const s = kind === 'left' ? 1 : -1; // 反転はこの符号だけ
-    return [
-      { transform: 'translate(0,0) scale(.62)', opacity: .85 },
-      { transform: `translate(${dx * 0.52 + s * 20}px, ${dy * 0.5 - 26}px) scale(.85)`, opacity: 1, offset: 0.55 },
-      { transform: `translate(${dx}px, ${dy}px) scale(${s1})`, opacity: 1 },
-    ];
+// ---------- 出たカードの演出（update8: 本人確定フロー） ----------
+// 一連の流れ（場にカードが出るたび、全員の画面で同一に流れる）:
+//   段階A: 出したプレイヤーの手札の位置から画面中央へ、裏面のまま移動し大写しサイズまで拡大（0.7秒）
+//   段階B: 中央で裏→表にフリップ（表アニメーション0.4秒）し、そのまま大写し（modal-card 級）で静止（0.8秒）＝「注視」の本体
+//   段階C: 表のまま中央から場札の置き場（#field-card）へ移動しつつ場カード大に縮小し、場札として収まる（約0.4秒）
+//   秒数はいずれも本人指定（2026-11-12 update9: 移動0.7／表アニメーション0.4／大写し0.8）。合計 約2.3秒でドボン受付2.5秒に収まる。
+//   例外: 両面表の24（df）と、11で公開中だったカード（rv）は「両面が表」なので表のまま移動しフリップしない。出した本人の画面でも表のまま（本人指定）でフリップしない。
+//   出されたカードは外縁を出したプレイヤーの色で細く発光させ、手番が終わったら消す（本人指定）。
+// ゴーストは pointer-events:none で操作を妨げない。
+// アニメーションの間、場の実カードは隠し（#field-card.fx-hide）、着地の瞬間に切り替えて二重に見せない。
+// 旧来の「場へ直行する飛行」と「左からスライドインする大写し」は、本フローに統合して廃止した（update8）。
+let playedTimers = [];
+let playFxToken = 0;
+let playedGlow = null; // 直前に出されたカードの発光情報 {cardId, playerId}（場札の外縁をそのプレイヤーの色で細く光らせる）
+
+// 出したプレイヤーの手札位置（起点）と席の種類を求める。
+// 自分=手札のそのカード要素（描画後フォールバック時は既に手札に無いので手札エリア）、相手=裏面列。
+// kind は軌道の弧の付け方に使う（左席=左寄りの弧／右席=右寄りの弧／正面=真っ直ぐ手前／自分=少し浮く）
+function playOrigin(playerId, cardId) {
+  if (playerId === myId) {
+    const el = document.querySelector(`#hand .card[data-cid="${cardId}"]`);
+    if (el) { const r = el.getBoundingClientRect(); return { rect: r, kind: 'mine', startW: r.width || 66 }; }
+    const h = $('hand');
+    if (h) return { rect: h.getBoundingClientRect(), kind: 'mine', startW: 66 };
+    return null;
   }
-  if (kind === 'top') { // 正面: 真っ直ぐ手前へ落ちてきて大きくなる
-    return [
-      { transform: 'translate(0,0) scale(.5)', opacity: .8 },
-      { transform: `translate(${dx}px, ${dy}px) scale(${s1})`, opacity: 1 },
-    ];
-  }
-  // 自分: 手札から少し浮いて場へ
-  return [
-    { transform: 'translate(0,0) scale(1)', opacity: 1 },
-    { transform: `translate(${dx * 0.5}px, ${dy * 0.5 - 16}px) scale(.95)`, opacity: 1, offset: 0.5 },
-    { transform: `translate(${dx}px, ${dy}px) scale(${s1})`, opacity: 1 },
-  ];
-}
-function flyToField(ev, card) {
-  const field = $('field-card');
-  if (!field) return;
-  const fr = field.getBoundingClientRect();
-  const tw = fr.width || 96, th = fr.height || 134;
-  let from = null, kind = 'top';
-  if (ev.playerId === myId) {
-    const el = document.querySelector(`#hand .card[data-cid="${ev.cardId}"]`);
-    if (el) { from = el.getBoundingClientRect(); kind = 'mine'; }
-  } else {
-    const backs = document.querySelector(`.opp-backs[data-pid="${ev.playerId}"]`);
-    if (backs) {
-      from = backs.getBoundingClientRect();
-      const seat = backs.closest('.seat');
-      if (seat && seat.id === 'seat-left') kind = 'left';
-      else if (seat && seat.id === 'seat-right') kind = 'right';
-      else {
-        // 縦画面フォールバック等: 場の中心との相対位置で振り分ける
-        const cx = from.left + from.width / 2, fx = fr.left + fr.width / 2;
-        kind = cx < fx - 40 ? 'left' : (cx > fx + 40 ? 'right' : 'top');
-      }
+  const backs = document.querySelector(`.opp-backs[data-pid="${playerId}"]`);
+  if (!backs) return null;
+  const rect = backs.getBoundingClientRect();
+  let kind = 'top';
+  const seat = backs.closest('.seat');
+  if (seat && seat.id === 'seat-left') kind = 'left';
+  else if (seat && seat.id === 'seat-right') kind = 'right';
+  else {
+    // 縦画面フォールバック等: 場の中心との相対位置で振り分ける
+    const field = $('field-card');
+    if (field) {
+      const fr = field.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2, fx = fr.left + fr.width / 2;
+      kind = cx < fx - 40 ? 'left' : (cx > fx + 40 ? 'right' : 'top');
     }
   }
-  if (!from) return;
-  const W = 84;
-  const ghost = cardEl(card);
-  ghost.classList.add('fly-card');
-  ghost.style.width = W + 'px';
-  const sx = from.left + from.width / 2 - W / 2;
-  const sy = from.top + from.height / 2 - (W * 1.4) / 2;
-  ghost.style.left = sx + 'px';
-  ghost.style.top = sy + 'px';
-  document.body.appendChild(ghost);
-  const dx = (fr.left + fr.width / 2) - (sx + W / 2);
-  const dy = (fr.top + fr.height / 2) - (sy + W * 1.4 / 2);
-  const anim = ghost.animate(flyKeyframes(kind, dx, dy, tw / W), { duration: 550, easing: 'ease-in-out', fill: 'both' });
-  anim.onfinish = () => ghost.remove();
-  setTimeout(() => ghost.remove(), 900); // 保険
+  return { rect, kind, startW: 46 }; // 裏面列のうち「出た1枚」の幅感
 }
-// (2) 大写し表示: 左から0.3秒で入る→1.0秒静止→右へ0.3秒で出る（合計1.6秒）。操作は妨げない
-let playedTimers = [];
-function showPlayedOverlay(card) {
-  const ov = $('played-overlay');
-  if (!ov) return;
+
+// ゴースト生成: 表裏2面の3D要素（内側 .flip-inner が rotateY で反転する）。
+// 裏面はボスの顔の裏面デザイン（card-back）。両面表の24（df）は裏面が存在しないので
+// 裏面を作らず、最初から表面を向けてフリップしない
+function buildPlayGhost(card, faceUp) {
+  const ghost = document.createElement('div');
+  ghost.className = 'fly-card play-ghost';
+  const inner = document.createElement('div');
+  inner.className = 'flip-inner';
+  const front = cardEl(card, { modal: true });
+  front.classList.add('flip-face', 'flip-front');
+  front.style.width = '100%'; front.style.height = '100%';
+  inner.appendChild(front);
+  if (!faceUp) {
+    const back = document.createElement('div');
+    back.className = 'flip-face flip-back';
+    inner.appendChild(back);
+  } else {
+    inner.style.transform = 'rotateY(180deg)'; // 両面表／公開中だったカード／出した本人の画面: フリップせず表面のまま
+  }
+  ghost.appendChild(inner);
+  return { ghost, inner };
+}
+
+// 出すアニメーション本体: 起点（裏のまま）→ 中央でフリップ＋大写し静止 → 場（表のまま）を1つのゴーストで通す
+function playCardFlow(playerId, card) {
+  const field = $('field-card');
+  const origin = playOrigin(playerId, card.id);
+  if (!field || !origin) return;
+  const fr = field.getBoundingClientRect();
+  const vw = window.innerWidth || 1024, vh = window.innerHeight || 768;
+  // 大写しサイズ（modal-card 級: min(40vw,168px)。縦に収まらない場合は高さからも制限する）
+  let Wm = Math.min(vw * 0.40, 168);
+  if (Wm * 1.4 > vh * 0.8) Wm = (vh * 0.8) / 1.4;
+  const Hm = Wm * 1.4; // カード比 5:7
+  const Wf = fr.width > 0 ? fr.width : 144; // 場カードの実寸（低丈横画面では実測値が入る）
+  const sx = origin.rect.left + origin.rect.width / 2, sy = origin.rect.top + origin.rect.height / 2; // 起点の中心
+  const cx = vw / 2, cy = vh / 2; // 画面中央
+  const hasField = fr.width > 0 && fr.height > 0;
+  const tx = hasField ? fr.left + fr.width / 2 : cx, ty = hasField ? fr.top + fr.height / 2 : cy + Hm * 0.18; // 着地点の中心
+  const s0 = Math.max(0.2, Math.min(1, (origin.startW || 66) / Wm)); // 起点での見かけの大きさ
+  const s1 = Wf / Wm; // 着地時の大きさ（場カードと一致させる）
+  // ゴースト配置: 左上を起点中心に合わせ、transform は「中心の移動量＋scale」で表す（transform-origin は中心）
+  const faceUp = !!card.df || !!card.rv || playerId === myId; // 両面表／11で公開中だったカード（rv）と、出した本人の画面では表のまま（フリップしない）
+  const { ghost, inner } = buildPlayGhost(card, faceUp);
+  // 出されたカードは外縁を出したプレイヤーの色で細く発光させる（本人指定）。場に着地した後もフェーズが進むまで場札側で光り続ける
+  const glowCss = pcolor(S && S.players ? S.players.find((p) => p.id === playerId) : null).css;
+  ghost.style.boxShadow = `0 0 0 2px ${glowCss}, 0 0 16px ${glowCss}, 0 10px 22px rgba(0,0,0,.55)`;
+  ghost.style.width = Wm + 'px';
+  ghost.style.height = Hm + 'px';
+  ghost.style.left = (sx - Wm / 2) + 'px';
+  ghost.style.top = (sy - Hm / 2) + 'px';
+  ghost.style.transform = `translate(0px, 0px) scale(${s0})`;
+  document.body.appendChild(ghost);
+  field.classList.add('fx-hide'); // 場の実カードは着地まで隠す
+  const token = ++playFxToken;
+  const T_A = 700, T_FLIP = 400, T_HOLD = 800, T_C = 400, total = T_A + T_FLIP + T_HOLD + T_C; // 本人指定: 移動0.7秒／表アニメーション0.4秒／大写し0.8秒。場への移動0.4秒で合計2300ms（受付2.5秒以内）
+  const oA = T_A / total, oF = (T_A + T_FLIP) / total, oB = (T_A + T_FLIP + T_HOLD) / total;
+  // 席による弧: 左席は左寄り、右席は右寄りに膨らみ、正面はほぼ真っ直ぐ、自分は少し浮き上がる
+  const arcA = origin.kind === 'left' ? { x: -26, y: -20 }
+    : origin.kind === 'right' ? { x: 26, y: -20 }
+    : origin.kind === 'top' ? { x: 0, y: -8 } : { x: 0, y: -26 };
+  const midAx = (cx - sx) * 0.5 + arcA.x, midAy = (cy - sy) * 0.5 + arcA.y;
+  const midCx = (tx - sx) * 0.5, midCy = (ty - sy) * 0.5 - 16;
+  const frames = [
+    { transform: `translate(0px, 0px) scale(${s0})`, opacity: .9, easing: 'ease-out' },
+    { transform: `translate(${midAx}px, ${midAy}px) scale(${(s0 + 1) / 2})`, opacity: 1, offset: oA / 2 },
+    { transform: `translate(${cx - sx}px, ${cy - sy}px) scale(1)`, opacity: 1, offset: oA, easing: 'linear' },
+    { transform: `translate(${cx - sx}px, ${cy - sy}px) scale(1)`, opacity: 1, offset: oB, easing: 'ease-in-out' },
+    { transform: `translate(${midCx}px, ${midCy}px) scale(${(1 + s1) / 2})`, opacity: 1, offset: (oB + 1) / 2 },
+    { transform: `translate(${tx - sx}px, ${ty - sy}px) scale(${s1})`, opacity: 1 },
+  ];
+  let anim = null;
+  try { anim = ghost.animate(frames, { duration: total, easing: 'linear', fill: 'both' }); } catch { anim = null; }
+  if (!anim) { // WAAPI が無い環境では中央の大写し位置に静止表示し、時間で片付ける
+    ghost.style.transform = `translate(${cx - sx}px, ${cy - sy}px) scale(1)`;
+  }
+  // フリップ: 段階Aの移動が終わるタイミングで裏→表へ反転させる（両面表の24と本人の画面では反転しない）
+  if (!faceUp) {
+    let flipAnim = null;
+    try {
+      flipAnim = inner.animate([
+        { transform: 'rotateY(0deg)', offset: 0 },
+        { transform: 'rotateY(0deg)', offset: oA },
+        { transform: 'rotateY(180deg)', offset: oF },
+        { transform: 'rotateY(180deg)', offset: 1 },
+      ], { duration: total, easing: 'linear', fill: 'both' });
+    } catch { flipAnim = null; }
+    if (!flipAnim) { // WAAPI が無い環境: 中央到着のタイミングで表面に切り替える
+      playedTimers.push(setTimeout(() => { inner.style.transform = 'rotateY(180deg)'; }, T_A));
+    }
+  }
+  const finish = () => {
+    if (token !== playFxToken) return; // 後続のフローが始まっていたら触らない
+    ghost.remove();
+    field.classList.remove('fx-hide'); // 着地: 場の実カードへ切り替える
+  };
+  if (anim) { try { anim.onfinish = finish; } catch {} }
+  playedTimers.push(setTimeout(finish, total + 120)); // 保険
+}
+
+// 出す演出の発火管理（update7→8）: 一次経路（lastEvent差分）と render 側フォールバックの
+// 両方から呼ばれる共通入口。「ラウンド＋カードID＋出した人」をキーに一度だけ発火する。
+// 演出の中身は playCardFlow（手札→中央で大写し→場）の一連フローに差し替えた。
+// CPU のプレイも同じサーバーイベント経由でここに来る
+let fxFiredKey = '';
+function firePlayFx(playerId, card) {
+  if (!card || !card.id) return;
+  const key = `${S ? S.round : '?'}:${card.id}:${playerId}`;
+  if (key === fxFiredKey) return;
+  fxFiredKey = key;
+  playedGlow = { cardId: card.id, playerId };
   playedTimers.forEach(clearTimeout); playedTimers = [];
-  ov.innerHTML = '';
-  const el = cardEl(card, { big: true });
-  ov.appendChild(el);
-  ov.classList.remove('hidden');
-  el.animate([
-    { transform: 'translateX(-130vw)' },
-    { transform: 'translateX(0)', offset: 0.1875 },
-    { transform: 'translateX(0)', offset: 0.8125 },
-    { transform: 'translateX(130vw)' },
-  ], { duration: 1600, easing: 'ease-in-out', fill: 'both' });
-  playedTimers.push(setTimeout(() => { ov.classList.add('hidden'); ov.innerHTML = ''; }, 1680));
+  playFxToken++; // 進行中の旧フローを無効化する（finish の token ガードで片付けを止める）
+  const old = document.querySelector('.fly-card'); if (old) old.remove();
+  const field = $('field-card'); if (field) field.classList.remove('fx-hide');
+  try { playCardFlow(playerId, card); } catch {}
 }
 function onPlayEvent(ev) {
   const card = S.fieldTop;
   if (!card || card.id !== ev.cardId) return;
-  flyToField(ev, card);
-  showPlayedOverlay(card);
+  firePlayFx(ev.playerId, card);
 }
+
 
 // ---------- モーダル ----------
 // kind: 'generic'（捨て札・得点・遊び方。ドボン受付が始まったら自動で退避する）
@@ -1034,7 +1207,7 @@ function maybeShowSelfCard() {
 function showHowto() {
   showModal(`<h3>遊び方</h3>
     <ol class="howto-list">
-      <li><b>自分の番</b>: まず山札から1枚引ける（引かなくてもいい）。場の条件（色と数字の範囲）に合うカードを1枚出して交代。合う札がなければパス。</li>
+      <li><b>自分の番</b>: 場の条件に合うカードを1枚出すか、山札から1枚引くか、どちらかを選ぶ。引いた後は、手札のどれを出してもいいし、出さずにパスもできる。出せる札がなければ、引くしかない。</li>
       <li><b>ドボン</b>: 誰かが出したカードの数字と、自分の手札の数字の合計がピッタリ同じなら「ドボン」と宣言できる。<b>宣言しなくてもいい</b>（義務ではない）。</li>
       <li><b>困ったらカードをタップ</b>: 1回タップで大きく表示され、効果の説明が出る。もう1回タップで場に出る。相手が触れているカードは、裏向きの列で持ち上がって見える。</li>
     </ol>
@@ -1077,6 +1250,14 @@ $('btn-kaeshi').onclick = () => send({ t: 'kaeshi' });
 $('btn-sound').onclick = () => { muted = !muted; localStorage.setItem('dobon_mute', muted ? '1' : '0'); render(); };
 $('btn-assist').onclick = () => { assist = !assist; localStorage.setItem('dobon_assist', assist ? '1' : '0'); render(); };
 $('btn-oppnums').onclick = () => { showOppNums = !showOppNums; localStorage.setItem('dobon_oppnums', showOppNums ? '1' : '0'); render(); };
+// 全画面（update7・実機対応）: URL欄を消す本命対策。横画面ロックは可能な時だけ試み、失敗は握りつぶす
+$('btn-fullscreen').onclick = async () => {
+  try {
+    if (document.fullscreenElement) { await document.exitFullscreen(); return; }
+    await document.documentElement.requestFullscreen();
+    try { await screen.orientation.lock('landscape'); } catch {}
+  } catch {}
+};
 $('btn-howto').onclick = () => showHowto();
 $('btn-howto2').onclick = () => showHowto();
 $('btn-sort').onclick = () => { sortingMode = !sortingMode; if (!sortingMode && handDrag) handPointerCancel(); render(); };

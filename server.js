@@ -70,7 +70,7 @@ function mkRoom(host, settings) {
     players: [host],
     phase: 'lobby', // lobby|startChoice|turn|dobonWindow|dobonExtra|kaeshi|settle|gameover
     round: 0, markerId: host.id,
-    deck: [], discard: [], field: null, fieldTop: null,
+    deck: [], discard: [], field: null, fieldTop: null, fieldTopRv: false, // 場札が「11で公開中だったカード」か（update10: 【仮表面】として両面表扱いにする演出フラグ。場でトップにある間だけ付く）
     currentId: null, lastPlayerId: null, passCount: 0,
     pendingDraw: 0, pendingReveal: 0, mustNagashi: false, drewThisTurn: false,
     window: null, reservation: null, settle: null, result: null,
@@ -187,6 +187,7 @@ function startRound(room) {
   // 最初の場札（ドボン受付なし: 仕様10節E）
   const top = room.deck.pop();
   room.fieldTop = top;
+  room.fieldTopRv = false; // 最初の場札は公開経由ではない
   room.discard = [top];
   room.field = fieldFromCard(top);
   room.currentId = room.markerId;
@@ -284,16 +285,22 @@ function doPlay(room, player, cardId, choice = {}, isAuto = false) {
 
   clearTimer(room, 'turn');
   clearTouch(room, player); // 出したら「触れている位置」は消える（手札の添字もずれる）
+  // update10（本人確定）: 11で公開中だったカードの「両面が表」は【仮表面】という位置づけ。
+  // そのまま場に出す時は全員の画面で表のまま移動しフリップしない。判定は revealed から
+  // 外す前に行う。仮表面は場でトップにある間（見えている間）だけ: フラグは現在の場札に
+  // だけ付き、次のカードに覆われた時点で通常に戻る（捨て札・再シャッフル先では特別扱いしない）
+  const wasRevealed = player.revealed.has(cardId);
   player.hand.splice(idx, 1);
   player.revealed.delete(cardId);
   room.discard.push(card);
   room.fieldTop = card;
+  room.fieldTopRv = wasRevealed;
   room.field = fieldFromCard(card, choice);
   room.lastPlayerId = player.id;
   room.passCount = 0;
   room.mustNagashi = false;
   room.reservation = null;
-  event(room, 'play', { playerId: player.id, cardId: card.id }); // クライアントの「場へ飛ぶ＋大写し」演出用
+  event(room, 'play', { playerId: player.id, cardId: card.id, rv: wasRevealed }); // クライアントの出すアニメーション演出用（rv=公開中だったカード）
 
   // ドボン受付（3.5秒の確定空白）
   room.phase = 'dobonWindow';
@@ -475,6 +482,10 @@ function doDraw(room, player) {
 function doPass(room, player, isAuto = false) {
   if (room.phase !== 'turn' || room.currentId !== player.id) return false;
   if (room.pendingDraw > 0 || room.pendingReveal > 0 || room.mustNagashi) return false;
+  // ルール（2026-11-12 本人訂正）: 通常手番の最初の選択は「手札を出す」か「山札を引く」か。
+  // パスは山札を1枚引いた後のみ選べる。出せる札が無いプレイヤーは引くしかない。
+  // isAuto（手番制限時間切れ・切断中の自動処理）だけは例外として従来どおり自動パスを認める。
+  if (!isAuto && !room.drewThisTurn) return false;
   clearTimer(room, 'turn');
   room.passCount += 1;
   event(room, 'pass');
@@ -594,7 +605,9 @@ function viewFor(room, me) {
     hostId: room.hostId, markerId: room.markerId,
     currentId: room.currentId, turnEndsAt: room.turnEndsAt || null,
     deckCount: room.deck.length,
-    fieldTop: room.fieldTop ? publicCard(room.fieldTop) : null,
+    // rv（update10）: 場札が「公開中だったカード」なら true（【仮表面】。場でトップにある間だけ）。出すアニメーションの
+    // フォールバック経路（lastEvent を取りこぼした場合）でも表のまま扱えるようにするためのフラグ
+    fieldTop: room.fieldTop ? { ...publicCard(room.fieldTop), rv: !!room.fieldTopRv } : null,
     field: room.field,
     discard: room.discard.map(publicCard),
     pendingDraw: room.pendingDraw, pendingReveal: room.pendingReveal,
@@ -625,6 +638,10 @@ function viewFor(room, me) {
       handCount: p.hand.length,
       // 公開情報: 11で公開されたカード + 両面24の所在
       openCards: p.hand.filter((c) => p.revealed.has(c.id) || c.doubleFaced).map(publicCard),
+      // 公開位置（update10）: 11で公開中のカードが「手札のどの位置か」を、相手の扇で
+      // その位置だけ表面＋目アイコンで示すために送る。載せるのは公開済みカードの情報だけで、
+      // 非公開カードの位置・中身は一切含めない（位置以外の新たな情報漏洩は生じない）
+      openSlots: p.hand.map((c, i) => (p.revealed.has(c.id) ? { i, card: publicCard(c) } : null)).filter(Boolean),
       hasDouble24: p.hand.some((c) => c.doubleFaced),
     })),
     me: {
@@ -865,4 +882,4 @@ if (require.main === module) {
 }
 
 // テスト用（スモークテストの再現ケースから内部関数を直接検証するため）
-module.exports = { mkRoom, mkPlayer, viewFor, doPlay, playableCards, closeWindow, doTouch, PLAYER_COLORS };
+module.exports = { mkRoom, mkPlayer, viewFor, doPlay, playableCards, closeWindow, doTouch, PLAYER_COLORS, doPass, doDraw, doReveal };
