@@ -1,8 +1,13 @@
 ---
-状態: 提案中（移行ドラフト / 2026-11-13）
-出所: files/iron-plate-spec.md（作業場の蓄積）
-注意: これは移行ドラフト。本人の承認を経て「確定」になる。数値の実行上の正は合成スクリプト（tools/）。
+状態: 確定（2026-11-14、aged v2 の再測定値を追記。本人が aged v2 を鉄板の正の基準として再確認）
+出所: files/iron-plate-spec.md（作業場の蓄積）＋ 2026-11-14 の原画再測定
+注意: 数値の実行上の正は合成スクリプト（tools/）。破棄されたスプライト由来の数値は使わない。
 ---
+
+## aged v3 の位置づけ（2026-11-14 0時、本人決定・範囲を本人が明示）
+
+- **aged v3 で正なのは、紙質・汚れ具合・色合いの3点のみ**。枠・名前欄・レイアウトなど他の要素の正は従来どおり（枠デザインと名前欄エリアの色合いは aged v1 が正）。
+- 紙質・汚れ・色合いで aged v3 と競合する過去のものは破棄する。
 
 # 数字鉄板パネル仕様（生成プロンプト再現レベル）
 
@@ -98,3 +103,51 @@
 
 ---
 
+
+## aged v2 鉄板の実測と再現プロンプト（2026-11-14、原画から再測定）
+
+基準画像: 24カジノ aged v2（1280×1920）。破棄されたスプライト由来の旧数値（仕切り線66%など）は使わない。
+
+### 実測（カード座標 px）
+
+- 本体: 左端 x≈45、右端 x≈505（幅 ≈460 = カード幅の約36%）。中心列でのタブ頂点 y≈83、下辺中央の尖り y≈539（高さ ≈456）。肩ラインは y≈100。
+- 吊り: カード上端から幅 ≈35 の黒い帯が x≈215〜250（本体中央の真上）を垂直に降り、鉄の輪（外径 ≈65）を通してタブの穴に繋がる。帯の上端はカードの上辺で切れ、画面外へ抜ける。タブは上辺中央の半円状の張り出しで、付け根に唐草状の装飾がある。
+- 仕切り線: 直線フィットで角度 **−2.23°**（右上がり）。左端（x=90）で y≈311、右端（x=490）で y≈296。本体高さに対する位置は肩から約52%（ほぼ中央）。
+- 数字「24」: 2桁の外接 x 86〜261（幅 175）。「2」x 86〜159（幅 73）、「4」x 179〜261（幅 82）。桁の高さ ≈110〜124。傾きのため右の桁の上端が約14px高い。色の中央値 RGB (233, 208, 164)（温かい生成り）。太さは「2」の縦画で約16〜31px（セリフの太細）。古典的なセリフ体。表面に小さな欠け・擦れが点在し、色は (240,222,180)〜(200,175,130) のむらがある（均一なベタではない）。
+- 矢印（下向きシェブロン）: 外接 x 301〜403、y 145〜262（幅 ≈102、高さ ≈117）。色の中央値 RGB (76, 109, 120)、明部は (144, 162, 170)、芯の暗部は (36, 79, 103) の鋼青。形は左右に開いた羽根スラット（各側5〜6段）と太い中央軸、下端の大きな鏃。擦れた青ペンキの質感。
+- 下段（v2 当時の形）: 左にセピア色の札束の山アイコン（x ≈125〜300、y ≈348〜418）、右に「5点」の生成り文字（x ≈306〜436、高さ ≈55〜60、色 (231, 214, 181)）。※得点の表記は後の決定で札束アイコンの個数に置き換え済み。ここは v2 原画の記録。
+- 鉄板面の色: 暗い青灰鉄。中央寄りは RGB (60〜75, 65〜75, 55〜65) 程度、周縁は (30〜45) 台まで暗く落ちる。フチは使い込まれた金属の明るい擦れ (239, 218, 178) が細く走る。
+
+### 再現プロンプト（鉄板単体を生成する場合）
+
+```
+Aged dark iron hanging sign plate for a card game, front view, straight-on.
+Vertical ornate sign silhouette, width:height about 100:135 — not a plain
+pentagon: a semicircular lug tab at top-center pierced by an iron ring,
+small concave saddles beside the tab, convex shoulder bumps with dome
+rivets, ear-like stepped top corners, sides nearly vertical with a shallow
+notch under each top corner and a slight outward bow at mid-height, bottom
+edge formed by two shallow inverted arches meeting in a small center point,
+ear-like lower corners. Surface: dark blue-grey forged iron, brighter in
+the center (RGB about 65,70,60), falling to near-black at the edges,
+brushed scratches, sparse rust specks, a raised forged rim with an inner
+groove and about 11 uneven dome rivets, thin worn bright metal highlights
+(RGB about 239,218,178) along the rim. A black leather strap about 35px
+wide (at card scale) descends from above the frame through the ring; the
+strap continues off the top edge. Two fields divided by a horizontal
+divider line at about 52% of the body height. Upper-left field: large
+classical serif numerals in warm ivory (RGB 233,208,164), strokes with
+serif contrast, small chips and scratches on the letter faces, uneven tone
+from (240,222,180) to (200,175,130). Upper-right field: a downward steel-
+blue chevron arrow (median RGB 76,109,120, highlights 144,162,170) built
+from a thick central shaft, five to six fletching slats opening to each
+side and a large triangular arrowhead, worn blue paint texture. Whole
+plate tilted so the divider line sits at -2.2 degrees (right side up).
+Soft drop shadow to the lower right. Muted, antique, hardboiled mood.
+No text other than the numerals.
+```
+
+### 合成時の数値（カード 1280×1920 基準）
+
+- 本体の配置: 左端 x=45、本体幅 460、タブ頂点 y=83。鉄板全体を仕切り線が −2.2° になるよう回す。
+- 数字と札束は鉄板と一緒に傾け、矢印だけは傾けず軸平行に置く（従来の確定どおり）。
