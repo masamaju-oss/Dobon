@@ -65,7 +65,7 @@
 - R-504後継者の証は当主の金の指輪。prompts/marker-ring.md が正。
 - R-505ブランク鉄板は prompts/blank-plate.md の生成版が原本。aged v2 原画はデザインの参照。
 - R-506効果アイコンの承認済みは SUIT・DRAW 2・DRAW 5（prompts/effect-icons-approved.md）。
-- R-507REVEAL（公開）アイコンは、裏面の金の目そのものを円盤にはめた版が承認済み（prompts/effect-icons-approved.md）。7の真鍮両頭矢印アイコンの判定。目アイコンの判定（原本は裏面の金の目）。
+- R-507REVEAL（公開）アイコンは、裏面の金の目そのものを円盤にはめた版が承認済み（prompts/effect-icons-approved.md）。「目」のモチーフは裏面の目に一本化する。平たいベクター調の目アイコン（eye-mark）は2026-11-13夜に本人が破棄を指示。11公開マーカーも裏面の目／REVEALからの派生に差し替える（アプリ組み込み時）。7の真鍮両頭矢印アイコンの判定。
 
 ## R-6 シーン（イラスト原画）
 
