@@ -1,39 +1,43 @@
 # ブランク鉄板（空白の鉄板）
 
-- 状態: 承認済み（2026-11-13 本人OK）
-- 承認画像: `../approved/blank-plate.webp`
-- 位置づけ: カード面の鉄板の新しい原本。数字・矢印・札束はこの上に部品として載せ、カード上では鉄板ごと約-2度に傾ける（数字・札束も一緒に傾き、矢印だけは軸平行に置く）
-- 経緯: aged v2 原画の鉄板がデザインの正（`plate.md`）。ただし原画から画素を消して空白化する方法は浮き彫りの陰影が残り成立しなかったため、要件をもとに最初から空白で生成したこの絵を原本とした
+- 状態: 承認済み（2026-11-14 本人OK「これを正とする」。第2版。第1版は差し替え）
+- 承認画像: `../approved/blank-plate.webp`（1600×1600）
+- 位置づけ: カード面の鉄板の原本。数字・矢印・札束はこの上に部品として載せる。**素材は鎖・接続パーツ・鉄板とも真っ直ぐに描いたものが正**で、カードへの配置時に吊り点（カード画面外の上）を中心に全体を右肩上がりに傾ける（角度の目安は約5〜6°）。
+
+## 構造（2026-11-14 本人の説明で確定）
+
+- 吊り点はカードの画面外（上）にある。そこから鎖が降りる。
+- 鉄板の吊り穴は、**上部センターの突起部分**に開く。穴は高く、**鉄板の上縁と穴の縁が隣り合う**位置。
+- 接続パーツ（シャックルと輪）は、その穴に配置され、鎖と鉄板をつなぐ。接続パーツと鎖のデザインは本人がOK済み。
+
+## 実測（承認画像、1600×1600）
+
+- 鉄板の外接: x 約284〜1293、y 約135（突起上端）〜1428（下端の尖り）。幅は完成カード幅の約3分の1が目安（合成時）。
+- 仕切り線: **外接範囲の上端から59%**（上段59%・下段41%。本人が基準拡大画像から実測して指定）。内幅の約96%を横断する金属の段差。素材が水平なため仕切り線も水平（実測 0.005°）。
+- 左右の辺: 左 +1.2°・右 −1.1°の左右対称のわずかなすぼまり。仕切り線との角度は 88.8°／91.1°で90°を挟んで対称。
+- 穴: 上部センターの突起の中。輪の中心は鉄板幅の約50%。
+- 面の色: 濃い炭色の鍛造鉄。周縁に使い込まれた金属の擦れ、面内に傷と錆びの斑点は中程度。
 
 ## 再現プロンプト
 
 ```
-Use the reference image only as the design reference for the hanging iron sign
-plate. Generate that same ornate hanging iron plate, completely EMPTY, as a
-standalone game asset on a plain very dark charcoal background, straight front
-view, perfectly axis-aligned, no tilt and no perspective. The plate is dark
-blue-grey-black forged iron, width-to-height ratio about 100:135, with a
-decorative hanging-sign silhouette: a suspension post and ring at the top
-center that continue out of the top edge of the image, a semicircular tab under
-the ring, small shoulder bumps, ear-like lower corners, and a bottom edge
-formed by two shallow reverse arches with a small central point. A raised
-forged rim with an inner incised groove follows the silhouette. About eleven
-hemispherical rivets of slightly irregular size and spacing sit along the rim.
-One straight horizontal divider groove crosses the plate at about 55 percent of
-its height, dividing it into an upper field and a lower field. Both fields are
-completely blank dark hammered iron: brighter toward the center, darker toward
-the edges, fine grain, scratches, faint stains, and a soft drop shadow toward
-the lower right. Absolutely no numbers, no letters, no arrows, no icons, no
-emblems and no text anywhere on the plate. Photorealistic forged metal, moody
-warm light from the upper left.
+Generate a blank hanging iron sign plate as a standalone game asset on a plain
+very dark background, drawn perfectly straight and level, front view, no tilt.
+The plate is a decorative shield-shaped sign of dark charcoal forged iron:
+slightly tapered sides narrowing gently and symmetrically toward the bottom,
+scalloped ears at the corners, a shallow wavy bottom edge with a small central
+point, and a raised forged rim with an inner groove and irregular rivets.
+At the top center the rim rises into a small protruding tab, and a circular
+hanging hole is punched through that tab, placed high so the top edge of the
+hole sits right next to the top edge of the plate. A dark iron ring and shackle
+connector sit in the hole. The face has two completely blank fields divided by
+a raised horizontal metal step at 59 percent of the plate's full height from
+the top. Worn dark iron texture: scratches, faint rust mottling, brighter worn
+edges. No numbers, no letters, no arrows, no icons, no text anywhere.
+Photorealistic forged metal, moody light.
 ```
 
-## 承認時点の原画との差異（本人が承知のうえでOK）
+## 経緯
 
-- 仕切り線の位置: 原画は高さの約66%、この絵は約57%（上の段が狭い）。
-- フチの金属が原画より少し明るく銀色寄り。
-
-## 基準の再確認（2026-11-14 0時ごろ、本人）
-
-- aged v2 のカードが、鉄板まわりの正の基準であることを本人が再確認した。正しいのは「鉄板の形・色合い」「カードにおける配置位置」「鉄板を吊るすパーツ」「矢印」「フォントの太さ・大きさ・色合い・汚れ」。
-- つまりこのブランク鉄板の色合い（銀色寄り）は、v2 の色合いに寄せることが今後の照合対象。数字も v2 のフォント属性に合わせる。
+- 第1版（2026-11-13承認）は、吊りポストが中央・仕切り線57%等が基準と合わず、2026-11-14に作り直し。本人の「傾き比較」文書（吊り金具は左寄り・傾き5〜6°目安・盾形・幅は約3分の1）と、その後の構造訂正（吊り点は画面外／穴は上部センターの突起／鉄板の縁と穴の縁を隣り合わせる）を受けて候補を生成し、画素補正で水平化・左右対称化・仕切り線59%化を行い、本人が「これを正とする」と承認した。
+- 旧・第1版は approved/ から外した（履歴に残る）。
