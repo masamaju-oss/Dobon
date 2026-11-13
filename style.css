@@ -77,12 +77,11 @@ button:disabled{opacity:.4;cursor:default}
 
 /* 相手の裏向きカード列（扇形にずらして重ねる）＋カード裏面（初版: 夜の街モノトーン+金、細い金の二重縁、中央に「24」の透かしとダイヤ格子） */
 .opp-backs{display:flex;align-items:flex-start;margin-top:5px;padding:10px 2px 0;min-height:58px;overflow:hidden} /* 上paddingは公開位置の目アイコンのはみ出しを通す分（update10） */
-/* カード裏面: 本番素材（files/production-assets/ 由来）。ボスの目が縦横とも中心
-   （横軸センターライン上）に来るよう切り取られた確定版。通常サイズは小サイズ用
-   card-back-s.webp（500×700）、大きな山札の積みは card-back.webp（1000×1400）を使う。
-   相手の裏面列・山札は同じ .card-back を使うため一括でこの絵になる */
-:root{--back-layer:url("card-back-s.webp") center / cover no-repeat}
-.card-back{position:relative;width:34px;height:48px;border-radius:4px;flex:0 0 auto;
+/* カード裏面（update12）: 新裏面メダリオン（faces/back.webp・濃紺の地に金の目と
+   月桂樹＋金の装飾縁）に差し替え。相手の裏面列・山札は同じ .card-back を使うため
+   一括でこの絵になる。寸法はカード比2:3に厳密統一する（方針9） */
+:root{--back-layer:url("faces/back.webp") center / cover no-repeat}
+.card-back{position:relative;width:34px;height:51px;border-radius:4px;flex:0 0 auto;
   background:var(--back-layer);
   border:1px solid rgba(0,0,0,.6);
   box-shadow:0 1px 2px rgba(0,0,0,.55)}
@@ -98,17 +97,14 @@ button:disabled{opacity:.4;cursor:default}
    （下半分だけカードに重なり、上半分はカードの上に飛び出す）。幅はカード幅の約1.2倍 */
 .eye-mark{position:absolute;left:50%;top:0;transform:translate(-50%,-50%);z-index:7;pointer-events:none;
   filter:drop-shadow(0 1px 2px rgba(0,0,0,.65))}
-/* 相手の扇: 公開位置の表面（小型）。裏面と同じ寸法・重なり・傾きを保ち、地色はスートで変える */
-.card-back.fan-open{background:#17181d;display:flex;align-items:center;justify-content:center;cursor:pointer}
-.card-back.fan-open.w{background:#e9e4d8}
-.card-back.fan-open .fan-num{font-weight:900;font-size:11px;color:#f2f2f2;text-shadow:0 1px 2px rgba(0,0,0,.6)}
-.card-back.fan-open.w .fan-num{color:#191919;text-shadow:none}
+/* 相手の扇: 公開位置の表面（小型）。裏面と同じ寸法・重なり・傾きを保ち、
+   完成面画像をそのまま縮小して全面に敷く（update12） */
+.card-back.fan-open{cursor:pointer;overflow:hidden}
+.card-back.fan-open .fan-face{width:100%;height:100%;display:block;object-fit:cover}
 .card-back.fan-open .eye-mark{width:27px}
-/* 自分の手札: 公開中カードは上にはみ出すアイコンを通すため overflow を開き、隣より手前に出す。
-   アートとフレーバー帯は自前の角丸で元の見た目を保つ */
+/* 自分の手札: 公開中カードは上にはみ出すアイコンを通すため overflow を開き、隣より手前に出す */
 #hand .card.is-open{overflow:visible;z-index:9}
-#hand .card.is-open .art{border-radius:6px}
-#hand .card.is-open .flavor{border-radius:0 0 6px 6px}
+#hand .card.is-open .face-img{border-radius:6px}
 #hand .card .eye-mark{width:118%}
 /* 公開中カードがある間だけ、手札エリアの上側にアイコンのはみ出し分（約20px）の余白を足す */
 #hand:has(.card.is-open){padding-top:26px}
@@ -120,7 +116,7 @@ button:disabled{opacity:.4;cursor:default}
 /* update11: 3点の間隔を広げ、卓の中景（モックの場の位置）に寄せて下げる。
    perspective は山札・捨て札を「卓に寝かせて置いた物」に見せるための遠近 */
 #table-center{display:flex;align-items:center;gap:clamp(22px,4vw,54px);justify-content:center;z-index:2;
-  margin-top:clamp(20px,7vh,76px);perspective:700px}
+  margin-top:clamp(20px,7vh,76px);padding-top:22px;perspective:700px}
 /* 天井ランプの光（update5・本人指示／update7で強化）: 卓中央（場札・捨て札エリア）に落ちる暖色の光だまり。
    update7: 実機で「照らされている雰囲気がなかった」ため、光だまり自体の濃さ（中心 .38／中間 .18）と
    広さ（山札・場札・捨て札を含む中央エリア）を上げた。画面全体を暗くはしない（光の外は従来の明るさ）。
@@ -134,13 +130,29 @@ button:disabled{opacity:.4;cursor:default}
 @keyframes lampSway{from{transform:translate(calc(-50% - 5px),calc(-50% - 2px)) rotate(-.5deg)}to{transform:translate(calc(-50% + 5px),calc(-50% + 2px)) rotate(.5deg)}}
 .pile{display:flex;flex-direction:column;align-items:center;gap:5px}
 .pile-label{font-size:11px;color:#f0dfba;text-shadow:0 1px 3px rgba(0,0,0,.8);white-space:nowrap}
-.pile-stack{width:56px;height:79px;border-radius:5px;
-  background:url("card-back.webp") center / cover no-repeat;
-  box-shadow:2px 2px 0 #2a2018, 3px 3px 0 #0e0b08, 5px 5px 0 #2a2018, 6px 6px 0 #0e0b08, 8px 8px 10px rgba(0,0,0,.55);
-  transform:rotateX(48deg) rotateZ(-5deg);transform-origin:50% 82%}
+/* 山札（update12・方針8）: 大きく、数枚を僅かにずらして重ねた「積み」で見せる。
+   寸法は2:3。寝かせ（rotateX）は面が読めなくなるためやめ、影で厚みを出す */
+#deck-pile{position:relative}
+#deck-pile.myturn{cursor:pointer}
+.pile-stack{position:relative;width:66px;height:99px}
+.pile-stack .card-back{position:absolute;left:0;top:0;width:66px;height:99px;border-radius:6px}
+.pile-stack .card-back:nth-child(1){transform:translate(3px,3px) rotate(1.6deg)}
+.pile-stack .card-back:nth-child(2){transform:translate(1.5px,1.5px) rotate(-1.1deg)}
+.pile-stack .card-back:nth-child(3){transform:rotate(.4deg);box-shadow:0 4px 10px rgba(0,0,0,.55)}
+/* パスボタン（update12・方針13）: 真鍮プレート風（焦げ茶の暗い地＋真鍮の細縁＋真鍮色の文字）。
+   山札を引いた後にだけ山札の上にフェードで現れ、押すか手番が進めば消える */
+.pass-plate{position:absolute;left:50%;top:-16px;transform:translateX(-50%);z-index:8;
+  padding:5px 20px 6px;font-size:14px;font-weight:800;letter-spacing:.35em;text-indent:.35em;
+  color:#d9b45c;background:linear-gradient(180deg,#3a2413,#241505);
+  border:1.5px solid #b08d3c;border-radius:6px;box-shadow:0 4px 10px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,226,160,.35);
+  opacity:0;visibility:hidden;transition:opacity .28s ease, visibility .28s;pointer-events:none;white-space:nowrap}
+.pass-plate.show{opacity:1;visibility:visible;pointer-events:auto}
 #discard-pile{cursor:pointer}
-#discard-top .mini-card{width:42px;height:60px;font-size:16px;transform:rotateX(46deg) rotateZ(6deg);transform-origin:50% 82%;box-shadow:2px 2px 0 rgba(20,10,0,.55), 4px 4px 0 rgba(90,60,25,.8), 5px 5px 8px rgba(0,0,0,.5)}
-#discard-top:empty::after{content:"";display:block;width:42px;height:60px;border:1.5px dashed rgba(240,223,186,.4);border-radius:4px}
+/* 捨て札の山（update12・方針12）: 実物のカードを少しずつずらして重ねる（一番上が現在の場札）。
+   ズレと角度は client.js が通し位置から決定的に付ける */
+#discard-top{position:relative;width:64px;height:96px}
+#discard-top .pile-card{position:absolute;left:0;top:0;--card-w:64px;box-shadow:0 3px 8px rgba(0,0,0,.5)}
+#discard-top:empty::after{content:"";display:block;width:64px;height:96px;border:1.5px dashed rgba(240,223,186,.4);border-radius:6px}
 #field-info{font-size:13px;color:#f6ecd2;max-width:170px;text-shadow:0 1px 3px rgba(0,0,0,.85)}
 #field-info .win{color:#ffd968;font-weight:700}
 
@@ -170,7 +182,6 @@ button:disabled{opacity:.4;cursor:default}
 #my-status .turn{color:var(--gold);font-weight:700}
 .hand-head{display:flex;align-items:center;gap:8px}
 .hand-head #hand-totals{flex:1;margin:2px 0 4px;text-align:left}
-.hand-head #btn-sort{flex:0 0 auto}
 /* update11: 手札合計はモックの黄色チップとして見せる */
 #hand-totals{font-size:14px;color:#f0e6cc}
 .hand-head #hand-totals{flex:0 1 auto;background:linear-gradient(180deg,#d9a92c,#b9861c);color:#2a1d05;
@@ -178,7 +189,8 @@ button:disabled{opacity:.4;cursor:default}
 #hand-totals b{color:var(--gold)}
 .hand-head #hand-totals b{color:#6d4d00}
 /* 自分の札束の山: 手札の直下 */
-#my-bundles{margin:0 0 4px;min-height:24px}
+/* 自分の札束は手札見出しの隣に小さく置く（update12・方針3）。手札と重なる配置は廃止 */
+#my-bundles{margin:0;flex:0 0 auto}
 #my-bundles .bundles{margin-top:0}
 
 /* --- 最下部バー: アクションボタン＋ドボン --- */
@@ -198,103 +210,45 @@ button:disabled{opacity:.4;cursor:default}
 @keyframes pulse{from{box-shadow:0 0 0 rgba(224,27,47,0)}to{box-shadow:0 0 16px rgba(200,20,35,.6)}}
 #host-tools{padding:0 10px 8px;display:flex;gap:8px;background:rgba(10,4,0,.5)}
 
-/* --- 札束トークン（駒）: 紙幣の縦横比 約2.35:1、側面の層で厚みを表現 --- */
-.bundles{position:relative;height:30px;margin-top:4px;cursor:pointer}
-.bundle{position:absolute;width:44px;height:19px}
-/* update11: 札束の山をモックの「卓に置いた山」の大きさへ。相手は山の幅を持たせて広げ、
-   自分はトークンをひと回り大きくする（置き場所は従来どおり） */
-.opp .bundles{width:132px;height:42px}
-.opp .bundle{width:58px;height:25px}
-.opp .bundle::before{height:16px}
-.opp .bundle::after{top:16px;height:9px}
-#my-bundles .bundles{height:38px}
-#my-bundles .bundle{width:54px;height:23px}
-#my-bundles .bundle::before{height:15px}
-#my-bundles .bundle::after{top:15px;height:8px}
-/* 【仮実装・差し替え口】札束トークンの上面: 承認済みデザイン画像が来たら --bundle-layer を url(...) に置き換える */
-:root{--bundle-layer:linear-gradient(rgba(0,0,0,0), rgba(0,0,0,0))}
-.bundle::before{content:"";position:absolute;left:0;right:0;top:0;height:12px;border-radius:2px 2px 0 0;
-  border:1px solid #5c7350;border-bottom:none;
-  background:
-    var(--bundle-layer),
-    linear-gradient(90deg, transparent 19px, #7a8f6d 19px, #7a8f6d 25px, transparent 25px),
-    linear-gradient(180deg,#d8e6c3,#a9c48f)}
-.bundle::after{content:"";position:absolute;left:0;right:0;top:12px;height:7px;border-radius:0 0 2px 2px;
-  border:1px solid #5c7350;border-top:none;
-  background:repeating-linear-gradient(180deg,#e8efdb 0 1.6px,#93a37e 1.6px 2.6px);
-  box-shadow:0 2px 3px rgba(0,0,0,.45)}
-.bundles.neg .bundle::before{border-color:#a35;background:
-    linear-gradient(90deg, transparent 19px, rgba(163,51,85,.55) 19px, rgba(163,51,85,.55) 25px, transparent 25px),
-    linear-gradient(180deg,#f6ccd1,#e0a0a7)}
-.bundles.neg .bundle::after{border-color:#a35;background:repeating-linear-gradient(180deg,#f3d3d7 0 1.6px,#c58a92 1.6px 2.6px)}
-.bundles.neg .bundle{opacity:.6}
-.bundles .bcount{position:absolute;right:0;top:0;font-size:11px;color:#e8dfc8;text-shadow:0 1px 2px rgba(0,0,0,.8)}
+/* --- 札束の山（update12: 承認済みアセット billstack.webp の画像方式） ---
+   横幅は従来の散らかった山（約130px）の約半分に収める。マイナス得点は
+   淡赤基調で透けた「仮の札束」として色調を変えて区別する（従来決定） */
+.bundles{position:relative;display:inline-block;margin-top:4px;cursor:pointer;line-height:0}
+.bundles .bundle-img{width:64px;height:40px;object-fit:cover;border-radius:4px;box-shadow:0 3px 7px rgba(0,0,0,.55)}
+.opp .bundles .bundle-img{width:58px;height:36px}
+.bundles.neg .bundle-img{filter:hue-rotate(-32deg) saturate(1.5) brightness(1.08);opacity:.55}
+.bundles .bcount{position:absolute;right:2px;top:1px;font-size:11px;line-height:1.2;color:#e8dfc8;text-shadow:0 1px 2px rgba(0,0,0,.8)}
 
 /* ============================================================
    手札（ファン状に重ね、数字+矢印が必ず見える）
    ============================================================ */
 #hand{display:flex;gap:0;overflow-x:auto;overflow-y:hidden;padding:10px 2px 4px;min-height:122px;align-items:center;scrollbar-width:none}
 #hand::-webkit-scrollbar{display:none}
-#hand.sorting{outline:1px dashed var(--gold);outline-offset:2px;border-radius:8px}
-#hand.sorting .card{touch-action:none;cursor:grab}
+/* update12・方針14: 並び替えはモードなしで常に有効。縦のドラッグ（＝並び替え）を
+   ブラウザのスクロールに奪われないよう、カードの touch-action は pan-x（横スクロール）だけに絞る */
+#hand .card{touch-action:pan-x;cursor:grab}
 #hand .card.dragging{z-index:30;transition:none;box-shadow:0 10px 24px rgba(0,0,0,.65);filter:brightness(1.15)}
+/* 操作フィードバック用トースト（update12: 無反応に見せないための小さな知らせ） */
+#toast{position:fixed;left:50%;bottom:118px;transform:translateX(-50%) translateY(8px);z-index:65;
+  max-width:88vw;padding:7px 16px;border-radius:18px;background:rgba(12,10,8,.92);border:1px solid #b08d3c;
+  color:#f2e7c8;font-size:13px;box-shadow:0 6px 16px rgba(0,0,0,.55);
+  opacity:0;visibility:hidden;transition:opacity .22s ease, transform .22s ease, visibility .22s;pointer-events:none;text-align:center}
+#toast.show{opacity:1;visibility:visible;transform:translateX(-50%) translateY(0)}
 
 /* ============================================================
-   カード（情報レイヤー）: アスペクト比 5:7 を維持し見切れない
+   カード（update12: 完成面方式）: アスペクト比 2:3 を全表示で厳密統一（方針9）。
+   完成面画像を全面に敷くだけで、オーバーレイ（数字・矢印・スートドット・
+   札束バッジ・効果アイコン・フレーバー）は一切持たない。縮小表示も同じ
+   .card のまま幅だけを変える（別レイアウト・切り取り禁止・方針15）
    ============================================================ */
-.card{position:relative;width:var(--card-w);aspect-ratio:5/7;flex:0 0 auto;overflow:hidden;
-  border-radius:7px;border:2px solid #666;background:#23242a;color:#fff;user-select:none;
-  --flavor-h:19px}
-.card.suit-W{background:#e9e4d8;color:#191919;border-color:#999}
-.card.suit-B{background:#17181d;color:#f2f2f2;border-color:#555}
+.card{position:relative;width:var(--card-w);aspect-ratio:2/3;flex:0 0 auto;overflow:hidden;
+  border-radius:7px;border:2px solid #666;background:#23242a;color:#fff;user-select:none}
 .card.gold-frame{border-color:var(--gold)}
-.card .art{position:absolute;inset:0;background-size:contain;background-repeat:no-repeat;background-position:center;opacity:.98}
+.card .face-img{width:100%;height:100%;display:block;object-fit:cover;pointer-events:none}
 .card .art-none{position:absolute;inset:22px 0 30px;display:flex;align-items:center;justify-content:center;font-size:40px;font-weight:900;opacity:.16}
-/* 左上クラスタ: 数字+矢印+スートをひと塊で */
-.card .idx{position:absolute;top:2px;left:4px;z-index:3;display:flex;align-items:flex-start;gap:2px;font-weight:900;font-size:19px;line-height:1;text-shadow:0 1px 3px rgba(0,0,0,.7)}
-.card.suit-W .idx{text-shadow:0 1px 2px rgba(255,255,255,.65)}
-.card .idx .arrow{font-size:13px;margin-top:1px}
-.card .idx .suit-dot{width:10px;height:10px;border-radius:50%;border:1.5px solid #888;margin-top:3px;flex:0 0 auto}
-.card.suit-W .idx .suit-dot{background:#f5f5f5}
-.card.suit-B .idx .suit-dot{background:#0a0a0a}
-/* 札束バッジ: 数字+矢印の少し下（2026-11-11 本人新指定。旧: 右上） */
-.card .score-badge{position:absolute;top:26px;left:3px;z-index:3;width:30px;height:24px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.55))}
-.card .score-badge svg{width:100%;height:100%}
-.card .score-badge .bnum{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;color:#ffe9a8;text-shadow:0 1px 2px #000}
-/* 効果アイコン専用領域: フレーバー帯の上に必ず間隔を空けて確保する（優先順位: 効果アイコン＞フレーバー）。
-   帯の高さは --flavor-h でサイズ別に連動させ、どの表示サイズでも重ならない構造にする。
-   【2026-11-11 ルール変更】アイコンは円形の「紋章メダル」に収める。高さ上限は旧「11のアイコン＝
-   カード縦の約18%」から「カード縦の最大3/7まで可」に変更（実装は32%）。真鍮色の縁取り＋
-   濃い地のプレート＋影で浮き上がらせ、イラスト背景に混ざらないようにする（スートで地は変えない） */
-.card .fx{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(var(--flavor-h) + 5px);height:32%;aspect-ratio:1;z-index:4;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  border-radius:50%;border:2px solid #b08d3c;
-  background:radial-gradient(circle at 35% 28%, #3d3423, #191410 68%, #0d0a07);
-  box-shadow:0 3px 7px rgba(0,0,0,.6), 0 0 0 1.5px rgba(0,0,0,.55), inset 0 1px 3px rgba(255,226,160,.4), inset 0 -3px 6px rgba(0,0,0,.6)}
-.card .fx:empty{display:none}
-.card .fx svg{height:58%;filter:drop-shadow(0 1px 1px rgba(0,0,0,.55))}
-.card .fx .fxlab{font-size:8px;font-weight:900;letter-spacing:.1em;line-height:1.1;color:#e9cf8f;text-shadow:0 1px 2px #000}
-.card.big .fx .fxlab{font-size:10px}
-.card.modal-card .fx .fxlab{font-size:12px}
-.card .flavor{position:absolute;left:0;right:0;bottom:0;height:var(--flavor-h);z-index:3;font-size:8.5px;display:flex;align-items:center;justify-content:center;
-  padding:0 3px;text-align:center;background:rgba(10,10,12,.72);color:#e8e2d0;border-top:1px solid #8a8d94;white-space:nowrap;overflow:hidden}
-.card.suit-W .flavor{background:rgba(240,236,226,.85);color:#333}
-.card.gold-line .flavor{border-top:1.5px solid var(--gold)}
-.card.draw5-mark{outline:2px solid var(--red);outline-offset:-4px}
-.card.big{--card-w:clamp(144px,11.5vw,176px);--flavor-h:26px} /* update11: 場カードは画面幅に連動してモックの存在感へ（下限144pxは従来どおり） */
-.card.big .idx{font-size:29px}
-.card.big .idx .arrow{font-size:19px}
-.card.big .idx .suit-dot{width:14px;height:14px;margin-top:5px}
-.card.big .score-badge{top:40px;width:44px;height:36px}
-.card.big .score-badge .bnum{font-size:23px}
-.card.big .flavor{font-size:11px}
-.card.modal-card{--card-w:min(40vw,168px);--flavor-h:30px}
-.card.modal-card .idx{font-size:38px}
-.card.modal-card .idx .arrow{font-size:25px}
-.card.modal-card .idx .suit-dot{width:17px;height:17px;margin-top:7px}
-.card.modal-card .score-badge{top:52px;width:56px;height:45px}
-.card.modal-card .score-badge .bnum{font-size:29px}
-.card.modal-card .flavor{font-size:12.5px}
+.card.big{--card-w:clamp(144px,11.5vw,176px)} /* update11: 場カードは画面幅に連動してモックの存在感へ（下限144pxは従来どおり） */
+.card.modal-card{--card-w:min(40vw,168px)}
+.card.thumb{--card-w:52px;cursor:pointer}
 #hand .card{cursor:pointer;transition:transform .12s, filter .12s}
 /* update11: 自分の手札も扇にする。角度と上下は layoutHand が --fan-rot / --fan-y で付ける */
 #hand .card{transform:rotate(var(--fan-rot,0deg)) translateY(var(--fan-y,0px));transform-origin:50% 94%}
@@ -372,15 +326,13 @@ button:disabled{opacity:.4;cursor:default}
 .flip-inner{position:relative;width:100%;height:100%;transform-style:preserve-3d}
 .flip-face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden}
 .flip-front{transform:rotateY(180deg);box-shadow:0 10px 22px rgba(0,0,0,.55)}
-.flip-back{background:url("card-back.webp") center / cover no-repeat;border-radius:7px;box-shadow:0 10px 22px rgba(0,0,0,.55)}
+.flip-back{background:url("faces/back.webp") center / cover no-repeat;border-radius:7px;box-shadow:0 10px 22px rgba(0,0,0,.55)}
 .open-flip{width:34px;height:50px;flex:0 0 auto;perspective:400px;cursor:pointer}
 .open-flip-inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;animation:openFlip .35s ease both}
 .open-flip .mini-card{width:100%;height:100%}
-.open-flip-back{background:url("card-back-s.webp") center / cover no-repeat;border-radius:4px;border:1.5px solid #777}
+.open-flip-back{background:url("faces/back.webp") center / cover no-repeat;border-radius:4px;border:1.5px solid #777}
 @keyframes openFlip{from{transform:rotateY(0deg)}to{transform:rotateY(180deg)}}
-/* 全体像アート（update7: 全カード共通。切り取らず絵全体を収め、余白はカードの地色で吸収する） */
-.card .art.full{background-size:contain;background-repeat:no-repeat}
-/* 後継者の証・庇護の証のアイコン */
+/* 後継者の証・ボスの信頼のアイコン（update12で改称＋コイン画像に差し替え） */
 .marker-img{width:17px;height:17px;border-radius:50%;vertical-align:-3px;border:1px solid rgba(201,162,39,.75);background:#14100a}
 .chip-img{width:15px;height:15px;border-radius:50%;vertical-align:-2px;margin-right:3px;border:1px solid rgba(201,162,39,.5)}
 
@@ -411,9 +363,9 @@ button:disabled{opacity:.4;cursor:default}
 #field-col{display:flex;flex-direction:column;align-items:center;gap:5px}
 #field-cond{display:flex;align-items:center;gap:6px;padding:3px 12px 4px;border-radius:999px;
   background:rgba(12,9,6,.88);border:1.5px solid #b08d3c;box-shadow:0 3px 8px rgba(0,0,0,.6)}
-#field-cond .cond-dot{width:13px;height:13px;border-radius:50%;border:1.5px solid #999;flex:0 0 auto}
-#field-cond .cond-dot.w{background:#f5f5f5}
-#field-cond .cond-dot.b{background:#0a0a0a}
+#field-cond .cond-suit{font-size:11px;font-weight:800;padding:1px 7px;border-radius:8px;border:1.5px solid #999;flex:0 0 auto}
+#field-cond .cond-suit.w{background:#f5f5f5;color:#191919}
+#field-cond .cond-suit.b{background:#0a0a0a;color:#f2f2f2}
 #field-cond .cond-num{font-size:19px;font-weight:900;color:#f6ecd2;line-height:1}
 #field-cond .cond-arrow{font-size:14px;font-weight:900;color:#f6ecd2}
 /* 手番残り秒数（数字だけ。バーは付けない） */
@@ -454,9 +406,7 @@ button:disabled{opacity:.4;cursor:default}
 /* 短い横画面ではスポットライトを圧縮する（スクロールに逃げず、要素自体を小さくする） */
 @media (orientation:landscape) and (max-height:500px){
   #spotlight .spot-panel{gap:5px}
-  #spotlight .card.modal-card{--card-w:min(30vh,148px);--flavor-h:24px}
-  #spotlight .card.modal-card .idx{font-size:30px}
-  #spotlight .card.modal-card .score-badge{top:42px;width:46px;height:37px}
+  #spotlight .card.modal-card{--card-w:min(30vh,148px)}
   #spotlight .card-modal-fx{padding:6px 10px}
   #spotlight .card-modal-fx p{font-size:12px;line-height:1.45}
   #spotlight .spot-backs img{width:min(15vw,64px)}
@@ -472,7 +422,8 @@ button:disabled{opacity:.4;cursor:default}
   .hand-head #hand-totals{font-size:12px;margin:1px 0 2px}
   #hand{--card-w:12.5vmin;min-height:0;padding:5px 2px 3px}
   #field-card .card.big{--card-w:min(132px,25vmin)}
-  #my-bundles{min-height:18px;margin:0 0 2px}
+  #my-bundles{margin:0}
+  #my-bundles .bundles .bundle-img{width:52px;height:33px}
   #bottom-bar{padding:4px 8px calc(5px + env(safe-area-inset-bottom))}
   #action-area{min-height:38px}
   #action-area button{padding:6px;font-size:13.5px}
@@ -483,13 +434,14 @@ button:disabled{opacity:.4;cursor:default}
   .opp .nm{font-size:11px;padding:1px 8px}
   .opp .meta{font-size:10px}
   .opp-backs{min-height:42px;margin-top:2px;padding-top:2px}
-  .opp-backs .card-back{width:26px;height:37px}
+  .opp-backs .card-back{width:26px;height:39px}
   .opp-backs .card-back + .card-back{margin-left:-14px}
-  .opp .bundles{width:104px;height:34px}
-  #my-bundles .bundles{height:30px}
-  #table-center{gap:10px;margin-top:10px}
-  .pile-stack{width:44px;height:62px}
-  #discard-top .mini-card{width:34px;height:50px;font-size:13px}
+  .opp .bundles .bundle-img{width:48px;height:30px}
+  #table-center{gap:10px;margin-top:10px;padding-top:18px}
+  .pile-stack{width:44px;height:66px}
+  .pile-stack .card-back{width:44px;height:66px}
+  #discard-top{width:42px;height:63px}
+  #discard-top .pile-card{--card-w:42px}
   .pile-label{font-size:10px}
   #field-info{font-size:11.5px;max-width:132px}
   #banner{padding:5px 12px;font-size:13px;bottom:4px}

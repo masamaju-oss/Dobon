@@ -23,8 +23,8 @@ const PCOLORS = [
 ];
 const pcolor = (p) => PCOLORS[(p && p.colorIdx) || 0] || PCOLORS[0];
 const myColorCss = () => (S && S.me ? (PCOLORS[S.me.colorIdx] || PCOLORS[0]).css : PCOLORS[0].css);
-let sortingMode = false;       // 並び替えモード中はドラッグ並び替え有効・タップで出す操作は無効
 let handDrag = null;           // ドラッグ並び替え中 {id, el, pid, startX, moved}
+let turnBannerUntil = 0;       // 手番の帯「{名前}、お前の番だ」の表示期限（update12: ターン最初に1秒だけ）
 let localHandOrder = null;     // 直近の並び替え結果（サーバー状態が追いつくまでの楽観表示用）
 let suppressTapUntil = 0;      // ドラッグ直後のタップ誤爆防止
 let selected = null;           // 手札の選択状態 {cardId, choice:{suit?,dir?}}（1タップ=選択+大写し、2タップ=場に出す）
@@ -167,59 +167,37 @@ function applyTouchLift(playerId) {
   [...row.children].forEach((b, i) => b.classList.toggle('touching', idx != null && i === idx));
 }
 
-// ---------- カード描画（情報レイヤー） ----------
-// イラストは「丸ごと」アセット（*-full.webp）を使う（update7・本人指示）。
-// 旧 band 画像（横長の帯を cover で被せる方式）は、表示時に被写体の左右が大きく
-// 切り取られる（切り取りの二重掛け）ため廃止した。新アセットは原画全体のリサイズ、
-// または承認サンプルのイラスト窓を縦長キャンバスに敷いたもので、表示側は
-// contain で切り取らずに収める。band ファイル自体は残置するが、もう参照しない。
+// ---------- カード描画（update12: 完成面方式） ----------
+// カード表示は「完成面画像（faces/）をそのまま使う」方式に切り替えた。
+// 数字・矢印・得点・効果アイコンは全て面画像に焼き込み済みで、DOMオーバーレイ
+// （idx/スートドット/札束バッジ/fx/フレーバー）は全廃止した（方針1・16）。
+// スート判別は絵の昼夜のみ。カード→面ファイルの対応表の正は game.js の faceForCard で、
+// サーバーが publicCard.face として送る。face が無い場合（旧 state 等）は下の写しで解決する。
 // アートパスはこのブロックに集約する（flat変換ではプレフィックス AP の値だけが変わる）
 const AP = '';
-const ART = {
-  0: AP + '0-full.webp', 1: AP + '1-full.webp', 2: AP + '2-full.webp', 3: AP + '3-full.webp',
-  4: AP + '4-full.webp', 5: AP + '5-full.webp', 6: AP + '6-full.webp', 7: AP + '7-full.webp',
-  8: AP + '8-full.webp', 9: AP + '9-full.webp', 10: AP + '10-full.webp', 11: AP + '11-full.webp',
-  12: AP + '12-full.webp', 24: AP + '24-casino.webp', // 24の既定はカジノ全体像（バリアント優先）
-};
-const ART_DRAW5 = AP + '1-draw5-full.webp'; // ドロー5黒1専用（密書。通常の1=共同水道とは別絵で管理）
-const ART24 = { // 24の絵柄バリアント（表示専用）。全体像を切り抜かずに見せる
-  casino: AP + '24-casino.webp', tower: AP + '24-tower.webp',
-  hq: AP + '24-hq.webp', hqBack: AP + '24-hq-back.webp', // 本部: 表=真昼／裏=夕景
-};
+const FACE_DIR = AP + 'faces/';
+function faceFileFor(card) { // game.js faceForCard のクライアント側の写し（face 未送信時の予備経路）
+  if (!card) return null;
+  if (card.num === 0) return 'face-0.webp';
+  if (card.num === 24) {
+    if (card.art === 'tower') return 'face-24-tower.webp';
+    if (card.art === 'hq') return 'face-24-hq.webp';
+    return 'face-24-casino.webp';
+  }
+  if (card.draw5) return 'face-1-B-up-draw5.webp';
+  return `face-${card.num}-${card.suit}-${card.arrow}.webp`;
+}
+function faceSrc(card) {
+  const f = (card && card.face) || faceFileFor(card);
+  return f ? FACE_DIR + f : null;
+}
+const FACE_BACK_SRC = FACE_DIR + 'back.webp';       // 通常の裏面（新メダリオン）
+const FACE_HQ_SRC = FACE_DIR + 'face-24-hq.webp';   // 本部（両面表24）: 表=真昼
+const FACE_HQ_NIGHT_SRC = FACE_DIR + 'face-24-hq-night.webp'; // 本部: 裏面位置=夜
 const MARKER_IMG = AP + 'marker-ring.webp'; // 後継者の証（紋章の印章指輪）
-const CHIP_IMG = { front: AP + 'chip-front.webp', back: AP + 'chip-back.webp' }; // 庇護の証 表／裏（死）
+const CHIP_IMG = { front: AP + 'coin-front.webp', back: AP + 'coin-back.webp' }; // ボスの信頼 表／裏（update12で改称＋画像差し替え）
+const BILL_IMG = AP + 'billstack.webp'; // 札束の山（update12: 画像方式に変更）
 const EYE_IMG = AP + 'eye-mark.webp'; // 11で公開中の目印: 横長楕円に金の目（本人指定デザイン、update10）。カードの上辺の中央に、下半分だけ重ねて置く
-// カード→表示アートの解決（全て「全体像を切り取らずに収める」full 表示。24はバリアント優先）
-function artFor(card) {
-  if (card.draw5) return { src: ART_DRAW5, full: true };
-  if (card.num === 24 && card.art && ART24[card.art]) return { src: ART24[card.art], full: true };
-  return { src: ART[card.num] || null, full: true };
-}
-const FLAVOR = {
-  0: 'ここでは、銃も金も、静かに眠る。', 1: '路地の奥に、最初の取引。', 2: 'その荷、次はお前が持て。',
-  3: '三番地の店先、今日も静か。', 4: '四番地、顔見知りだけの店。', 5: '五番地の灯りは消えない。',
-  6: '六番地、裏口はいつも開いている。', 7: 'この街の流れは、俺が決める。', 8: '八番地、噂は金より早い。',
-  9: '九番地、深夜の荷下ろし。', 10: '十番地、見張りがいる。', 11: '全部、見えている。',
-  12: '十二番地、街の果て。', 24: '街の金は、夜ここに集まる。',
-};
-function fxIcon(card) {
-  // 効果アイコン（2026-11-11 新ルール）: 高さ上限はカード縦の最大3/7まで可（CSS側で32%に設定）。
-  // 円形の紋章メダルの中に収める: 真鍮の縁取り＋濃い地＋影で、イラスト背景に混ざらないようにする。
-  // ラベルはSVGから分離し、メダル下部にHTMLテキストで置く（旧: SVG内テキスト＋18%上限）
-  const s = 'width:auto;height:100%';
-  const lab = (t) => `<span class="fxlab">${t}</span>`;
-  if (card.num === 0 || card.num === 24)
-    return `<svg style="${s}" viewBox="0 0 52 36"><rect x="11" y="2" width="30" height="30" rx="5" fill="#f5f5f5" stroke="#c9a227" stroke-width="3"/><path d="M11 2 L41 32 L11 32 Z" fill="#111"/></svg>${lab('変更')}`;
-  if (card.draw5)
-    return `<svg style="${s}" viewBox="0 0 52 36"><rect x="10" y="7" width="30" height="21" rx="2.5" fill="#7d1119"/><rect x="13" y="4" width="30" height="21" rx="2.5" fill="#d21f2e" stroke="#5c0a10" stroke-width="1.6"/><text x="28" y="21" font-size="14" font-weight="900" text-anchor="middle" fill="#fff">+5</text></svg>${lab('引5')}`;
-  if (card.num === 2)
-    return `<svg style="${s}" viewBox="0 0 52 36"><rect x="10" y="7" width="30" height="21" rx="2.5" fill="#8a3408"/><rect x="13" y="4" width="30" height="21" rx="2.5" fill="#f06414" stroke="#6e2a05" stroke-width="1.6"/><text x="28" y="21" font-size="14" font-weight="900" text-anchor="middle" fill="#fff">+2</text></svg>${lab('引2')}`;
-  if (card.num === 7)
-    return `<svg style="${s}" viewBox="0 0 52 36"><rect x="24.6" y="3" width="2.8" height="29" fill="#c9a227"/><rect x="4" y="3" width="19" height="21" rx="2.5" fill="#c1121f" stroke="#5c0a10" stroke-width="1.4"/><path d="M13.5 19 l0 -11 M9 12.5 L13.5 8 L18 12.5" stroke="#fff" stroke-width="2.6" fill="none"/><rect x="29" y="11" width="19" height="21" rx="2.5" fill="#1d3557" stroke="#0a1626" stroke-width="1.4"/><path d="M38.5 15 l0 11 M34 21.5 L38.5 26 L43 21.5" stroke="#fff" stroke-width="2.6" fill="none"/></svg>${lab('方向')}`;
-  if (card.num === 11)
-    return `<svg style="${s}" viewBox="0 0 52 36"><ellipse cx="26" cy="14" rx="17" ry="10" fill="#f2b63a" stroke="#7a5a10" stroke-width="2"/><circle cx="26" cy="14" r="5.8" fill="#38290a"/><circle cx="26" cy="14" r="2.6" fill="#000"/><rect x="12" y="25" width="13" height="9" rx="1.5" fill="#c9a227" transform="rotate(-8 18 29)"/><rect x="27" y="25" width="13" height="9" rx="1.5" fill="#c1121f" transform="rotate(6 33 29)"/><text x="30.5" y="32.5" font-size="7.5" font-weight="900" fill="#ffd7da">24</text></svg>${lab('公開')}`;
-  return '';
-}
 // 効果の文章説明（拡大モーダルに必ず表示する）
 function effectInfo(card) {
   if (card.draw5) return { name: 'ドロー5（黒の1）', text: '次の者が5枚引く。その者の手番は飛ぶ。回避できない、最奥の効果。' };
@@ -229,34 +207,16 @@ function effectInfo(card) {
   if (card.num === 11) return { name: '公開（目）', text: '次の者は、自分のいちばん大きいカードを全員に公開して、手番を終える。公開したカードは手札にある間ずっと全員に見えていて、それを場に出す時は表のまま出る。11を出せば累積して次へ回せる。' };
   return null;
 }
-function bundleSVG() {
-  // 札束バッジ: 最高額ドル紙幣（100ドル札）の緑系を参考に描き直し（2026-11-11）
-  // 最上の紙幣（肖像の楕円＋額縁）＋下の紙幣の層＋全体を束ねる帯が見える形
-  return `<svg viewBox="0 0 48 40">
-    <rect x="7" y="15" width="35" height="19" rx="2" fill="#5d7d5f"/>
-    <path d="M7 21h35 M7 26h35 M7 31h35" stroke="#425c44" stroke-width="1.6"/>
-    <rect x="7" y="15" width="35" height="19" rx="2" fill="none" stroke="#425c44" stroke-width="1.6"/>
-    <rect x="5" y="6" width="37" height="20" rx="2" fill="#aac7a2" stroke="#47634a" stroke-width="1.8"/>
-    <rect x="8.5" y="9.5" width="30" height="13" rx="1.5" fill="none" stroke="#5d7d5f" stroke-width="1.2"/>
-    <ellipse cx="23.5" cy="16" rx="4.6" ry="5.6" fill="#8fb48c" stroke="#47634a" stroke-width="1.2"/>
-    <circle cx="11" cy="12" r="1.7" fill="#7fa376"/><circle cx="36" cy="20" r="1.7" fill="#7fa376"/>
-    <rect x="20.5" y="6" width="6" height="28" fill="#e9ddc0" stroke="#a68f5e" stroke-width="1.2"/>
-  </svg>`;
-}
 function cardEl(card, opts = {}) {
+  // update12: 完成面画像をそのまま全面表示する。数字・矢印・得点・効果アイコンは
+  // 面に焼き込み済みのため、DOMオーバーレイは一切付けない（スートドット廃止・フレーバー廃止）
   const d = document.createElement('div');
   const special = card.num === 0 || card.num === 24;
-  d.className = 'card' + (special ? ' gold-frame gold-line' : (card.suit === 'W' ? ' suit-W' : ' suit-B')) + (opts.big ? ' big' : '') + (opts.modal ? ' modal-card' : '');
-  const a = artFor(card);
-  const art = a.src;
-  const flavor = card.draw5 ? '触れるな。ここは最奥だ。' : (FLAVOR[card.num] || '');
-  d.innerHTML = `
-    ${art ? `<div class="art${a.full ? ' full' : ''}" style="background-image:url(${art})"></div>` : `<div class="art-none">${card.num}</div>`}
-    <div class="idx"><span class="num">${card.num}</span><span class="arrow">${card.arrow === 'up' ? '↑' : '↓'}</span>${special ? '' : '<span class="suit-dot"></span>'}</div>
-    <div class="score-badge">${bundleSVG()}<span class="bnum">${card.pts}</span></div>
-    ${card.draw5 ? '<div style="position:absolute;inset:3px;border:2px solid #a31621;border-radius:5px;pointer-events:none;z-index:2"></div>' : ''}
-    <div class="fx">${fxIcon(card)}</div>
-    <div class="flavor">${flavor}</div>`;
+  d.className = 'card' + (special ? ' gold-frame' : '') + (opts.big ? ' big' : '') + (opts.modal ? ' modal-card' : '');
+  const src = faceSrc(card);
+  d.innerHTML = src
+    ? `<img class="face-img" src="${src}" alt="${card.num}${card.arrow === 'up' ? '↑' : '↓'}">`
+    : `<div class="art-none">${card.num}</div>`;
   return d;
 }
 // 相手の手札が並び替えられたら、裏向きカード列を揺らして「いじっている動き」を伝える
@@ -320,22 +280,17 @@ function openCardEl(c) {
   }
   return miniCard(c, true);
 }
-// 札束の山（決定的な疑似ランダムで雑に積む）
+// 札束の山（update12: 承認済みアセット billstack.webp の画像方式に変更。
+// 横幅は従来の散らかった山の約半分に収める。マイナスは淡赤の「仮の札束」として色調を変える）
 function bundlesEl(player, isMe) {
   const wrap = document.createElement('div');
   const s = player.score;
   wrap.className = 'bundles' + (s < 0 ? ' neg' : '');
-  const n = Math.min(Math.abs(s), 14);
-  let seed = player.id.charCodeAt(0) * 31 + Math.abs(s);
-  const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
-  for (let i = 0; i < n; i++) {
-    const b = document.createElement('div');
-    b.className = 'bundle';
-    b.style.left = (rnd() * 55) + '%';
-    b.style.bottom = Math.floor(i / 5) * 9 + rnd() * 3 + 'px';
-    b.style.transform = `rotate(${(rnd() * 36 - 18).toFixed(0)}deg)`;
-    wrap.appendChild(b);
-  }
+  const img = document.createElement('img');
+  img.className = 'bundle-img';
+  img.src = BILL_IMG;
+  img.alt = '札束の山';
+  wrap.appendChild(img);
   const c = document.createElement('span');
   c.className = 'bcount';
   // 札束の数字（update4・ユーザー決定）: 自分は常時表示。他者は設定ON/OFF（初期値ON）
@@ -381,7 +336,6 @@ function render() {
 function nameOf(id) { const p = S.players.find((p) => p.id === id); return p ? p.name : '？'; }
 
 function renderLobby() {
-  sortingMode = false;
   $('lobby-code').textContent = S.code;
   const st = S.settings;
   const roundsLabel = { '6': '6ラウンド', '8': '8ラウンド', '10': '10ラウンド', time: `時間制${st.minutes ? st.minutes + '分' : '（無制限）'}`, any: '任意終了' }[st.rounds];
@@ -410,9 +364,6 @@ function renderGame() {
   $('btn-assist').textContent = assist ? '補助: ON' : '補助: OFF';
   $('btn-oppnums').textContent = showOppNums ? '相手の点数: 表示' : '相手の点数: 隠す';
   $('screen-game').style.setProperty('--pc-self', myColorCss()); // 自分の色（枠・帯の差し色に使う）
-  $('btn-sort').textContent = sortingMode ? '並び替え終了' : '並び替え';
-  $('btn-sort').classList.toggle('gold', sortingMode);
-  $('hand').classList.toggle('sorting', sortingMode);
   $('host-tools').classList.toggle('hidden', !S.me.isHost || S.phase === 'gameover');
 
   // 相手: 座席配置（自分=下辺、相手は手番順に 左→正面→右。1人だけなら正面）
@@ -431,8 +382,8 @@ function renderGame() {
     d.style.setProperty('--pc', pc.css); // 手番枠・触れている裏面の縁取りはそのプレイヤーの色
     let chipHtml = '';
     if (st.elimination) chipHtml = p.chip === 'gake'
-      ? `<span class="chip-ico"><img class="chip-img" src="${CHIP_IMG.front}" alt="">庇護の証</span>`
-      : `<span class="chip-ico dead"><img class="chip-img" src="${CHIP_IMG.back}" alt="">庇護の証・死</span>`;
+      ? `<span class="chip-ico"><img class="chip-img" src="${CHIP_IMG.front}" alt="">ボスの信頼</span>`
+      : `<span class="chip-ico dead"><img class="chip-img" src="${CHIP_IMG.back}" alt="">ボスの信頼・死</span>`;
     const tl = (S.currentId === p.id && S.turnEndsAt) ? ' <span class="turn-left" data-pid="' + p.id + '"></span>' : '';
     d.innerHTML = `<div class="nm"><span class="pdot" style="background:${pc.css}"></span><span style="color:${pc.css}">${p.name}</span>${p.isMarker ? ` <img class="marker-img" src="${MARKER_IMG}" alt="後継者の証" title="後継者の証（スタートプレイヤー）">` : ''}</div>
       <div class="meta">手札 ${p.handCount}枚${p.connected ? '' : '・切断中'}${p.hasDouble24 ? '・両面24所持' : ''}${tl}</div>${chipHtml}`;
@@ -459,12 +410,14 @@ function renderGame() {
         continue;
       }
       const b = document.createElement('div');
-      b.className = 'card-back fan-open' + (slotCard.suit === 'W' ? ' w' : '');
+      b.className = 'card-back fan-open';
       b.title = '11で公開中のカード';
-      const num = document.createElement('span');
-      num.className = 'fan-num';
-      num.textContent = `${slotCard.num}${slotCard.arrow === 'up' ? '↑' : '↓'}`;
-      b.appendChild(num);
+      // update12: 公開位置の表面も完成面画像をそのまま縮小して出す（数字テキストの代用表示は廃止）
+      const fimg = document.createElement('img');
+      fimg.className = 'fan-face';
+      fimg.src = faceSrc(slotCard);
+      fimg.alt = '';
+      b.appendChild(fimg);
       const eye = document.createElement('img');
       eye.className = 'eye-mark'; eye.src = EYE_IMG; eye.alt = '';
       b.appendChild(eye);
@@ -487,22 +440,28 @@ function renderGame() {
   const me = S.players.find((p) => p.id === myId);
   const ms = $('my-status');
   let myChip = '';
-  if (st.elimination) myChip = me.chip === 'gake' ? '庇護の証: 表' : '庇護の証: 死（次に払い切れなければ破門）';
+  if (st.elimination) myChip = me.chip === 'gake' ? 'ボスの信頼: 表' : 'ボスの信頼: 死（次に払い切れなければ破門）';
   const mtl = (S.me.isMyTurn && S.turnEndsAt) ? ' <span class="turn-left" data-pid="' + myId + '"></span>' : '';
   ms.innerHTML = `${S.me.isMyTurn ? `<span class="turn" style="color:${myColorCss()}">お前の手番</span>` : `${nameOf(S.currentId)} の手番`}${mtl}　${myChip}`;
   // 番の呼びかけ帯＋専用SE（update4、オインクの番到来フローの翻訳。文面は本人の決定で「{名前}、お前の番だ」:
-  // 暗い地＋真鍮の縁取り＋自分の色の差し線。明るい黄帯にはしない）。帯は指示文の置き場所でもある
+  // 暗い地＋真鍮の縁取り＋自分の色の差し線。明るい黄帯にはしない）。
+  // update12（方針18）: 呼びかけはターン最初に1秒だけ表示して消す（手番中ずっと出し続けない）。
+  // 立ち上がり（自分の手番になった瞬間）で表示期限をセットし、再描画では期限内だけ出す
   const tb = $('turn-banner');
   const myStartChoice = S.phase === 'startChoice' && S.startChoice && S.startChoice.playerId === myId;
-  if (S.me.isMyTurn && S.phase === 'turn') {
+  const isMyTurnNow = S.me.isMyTurn && S.phase === 'turn';
+  if (isMyTurnNow && !prevMyTurn) {
+    turnBannerUntil = Date.now() + 1000;
+    beep(392, 0.09, 'triangle', 0.12); setTimeout(() => beep(587, 0.14, 'triangle', 0.12), 95); // 番到来の専用SE（低く短い2音）
+  }
+  if (isMyTurnNow && Date.now() < turnBannerUntil) {
     tb.textContent = `${nameOf(myId)}、お前の番だ`;
     tb.classList.remove('hidden');
-    if (!prevMyTurn) { beep(392, 0.09, 'triangle', 0.12); setTimeout(() => beep(587, 0.14, 'triangle', 0.12), 95); } // 番到来の専用SE（低く短い2音）
   } else if (myStartChoice) {
     tb.textContent = '開始の条件を選べ';
     tb.classList.remove('hidden');
   } else tb.classList.add('hidden');
-  prevMyTurn = S.me.isMyTurn && S.phase === 'turn';
+  prevMyTurn = isMyTurnNow;
   // 山札の光: 自分の番でまだ引いていない間だけ、山札の積みが弱く光る（物の大きさは変えない）
   $('deck-pile').classList.toggle('myturn', !!(S.me.isMyTurn && S.phase === 'turn' && !S.me.drewThisTurn && !S.pendingDraw && !S.pendingReveal && !S.mustNagashi));
   // 受け手への事前警告: 自分の手番に累積ドロー/公開が来ている間、手札エリア付近に出し続ける
@@ -517,8 +476,14 @@ function renderGame() {
     warn.textContent = '';
     warn.className = 'hidden';
   }
-  // 自分の札束の山は手札の下（#my-bundles）に配置する（2026-11-11 本人指定）
+  // 自分の札束の山は手札見出しの隣（#my-bundles）に小さく置く（update12・方針3。
+  // 旧配置「手札エリアの下に重なる大きな山」は手札のタップを奪う一因だったため廃止）
   const mb = $('my-bundles'); mb.innerHTML = ''; mb.appendChild(bundlesEl(me, true));
+  // パスボタン（update12・方針13）: 山札を引いた後にだけ、山札の上に真鍮プレートで出す
+  const pb = $('btn-pass');
+  const canPass = S.me.isMyTurn && S.phase === 'turn' && S.me.drewThisTurn
+    && !S.pendingDraw && !S.pendingReveal && !S.mustNagashi;
+  pb.classList.toggle('show', !!canPass);
 
   // 場（卓中央: 山札の積み／場札／捨て札の山）
   $('deck-count').textContent = S.deckCount + '枚';
@@ -537,14 +502,27 @@ function renderGame() {
     fel.onclick = () => showInfoCard(S.fieldTop);
     fc.appendChild(fel);
   }
+  // 捨て札の山（update12・方針12）: 枚数の数字表記はやめ、実物のカードを場に重ねていく。
+  // 1ターンごとに位置と角度に少しずつズレを持たせ（一番上が現在の場札）、
+  // ズレは捨て札の通し位置から決定的に作る（再描画で動かない）
   const dt = $('discard-top'); dt.innerHTML = '';
-  if (S.discard.length) dt.appendChild(miniCard(S.discard[S.discard.length - 1]));
-  $('discard-count').textContent = S.discard.length + '枚';
-  // 場の条件チップ（update4）: 条件は文章から独立させ、カードの顔と同じ部品
-  // （スートドット＋数字＋矢印）で場札の下に置く。文章は状況の説明だけに使う（文言の2層化）
+  const pileFrom = Math.max(0, S.discard.length - 7);
+  for (let i = pileFrom; i < S.discard.length; i++) {
+    const pc = cardEl(S.discard[i]);
+    pc.classList.add('pile-card');
+    let seed = (i + 1) * 7919 + 13;
+    const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+    const dx = (rnd() * 10 - 5).toFixed(1), dy = (rnd() * 6 - 3).toFixed(1), rot = (rnd() * 14 - 7).toFixed(1);
+    pc.style.transform = `translate(${dx}px, ${dy}px) rotate(${rot}deg)`;
+    pc.style.zIndex = i - pileFrom + 1;
+    if (i === S.discard.length - 1) pc.style.pointerEvents = 'none'; // 一番上は場札と同じカード（場札側でタップを受ける）
+    dt.appendChild(pc);
+  }
+  // 場の条件チップ（update4→update12）: 条件は文章から独立させ、場札の下に置く。
+  // update12: スートドットは廃止し、スートは「白／黒」の文字ラベルで示す（判別は絵の昼夜が担う）
   const fcond = $('field-cond');
   if (S.field) {
-    fcond.innerHTML = `<span class="cond-dot ${S.field.effSuit === 'W' ? 'w' : 'b'}"></span><span class="cond-num">${S.field.topNum}</span><span class="cond-arrow">${S.field.effArrow === 'up' ? '↑' : '↓'}</span>`;
+    fcond.innerHTML = `<span class="cond-suit ${S.field.effSuit === 'W' ? 'w' : 'b'}">${S.field.effSuit === 'W' ? '白' : '黒'}</span><span class="cond-num">${S.field.topNum}</span><span class="cond-arrow">${S.field.effArrow === 'up' ? '↑' : '↓'}</span>`;
     fcond.title = `条件: ${S.field.effSuit === 'W' ? '白（表通り）' : '黒（裏路地）'} ／ ${S.field.topNum}と同数字か、${S.field.effBase}${S.field.effArrow === 'up' ? '以上↑' : '以下↓'}`;
     fcond.classList.remove('hidden');
   } else fcond.classList.add('hidden');
@@ -640,9 +618,8 @@ function renderActions() {
   if (!S.me.isMyTurn || S.phase !== 'turn') return;
   if (S.pendingDraw > 0) { add(`ドロー${S.pendingDraw}枚を引く`, () => send({ t: 'drawPending' })); a.insertAdjacentHTML('beforeend', '<span class="hint" style="align-self:center">2を出せば累積して次へ</span>'); return; }
   if (S.pendingReveal > 0) { add(`最大のカード${S.pendingReveal}枚を公開する`, () => send({ t: 'reveal' })); a.insertAdjacentHTML('beforeend', '<span class="hint" style="align-self:center">11を出せば累積して次へ</span>'); return; }
-  if (!S.me.drewThisTurn && !S.mustNagashi) add('山札から1枚引く', () => send({ t: 'draw' }));
-  if (!S.mustNagashi && S.me.drewThisTurn) add('パス', () => send({ t: 'pass' }));
-  if (!S.mustNagashi && !S.me.drewThisTurn) a.insertAdjacentHTML('beforeend', '<span class="hint" style="align-self:center">パスは山札を引いた後で選べる</span>');
+  // update12（方針10・13）: ドローは「山札タップ」、パスは「引いた後に山札の上に出るプレート」
+  // に移行したため、このボタン群からは撤去した（説明文「パスは引いた後で選べる」も削除）
   if (S.mustNagashi) a.insertAdjacentHTML('beforeend', '<span class="hint" style="align-self:center">場流し: 好きなカードを1枚出せ</span>');
 }
 
@@ -684,9 +661,7 @@ function renderHand() {
   layoutHand();
   // ドボンの式表示（update4・第2ラウンド改訂形）: 補助ONかつ受付中だけ、合計と場の数字を並べる。
   // 不一致のときは「あと○で一致」とは書かず、事実として「○違い」とだけ出す（受付中に手札は変わらないため）
-  if (sortingMode) {
-    $('hand-totals').innerHTML = '並び替え中: カードを左右にドラッグ';
-  } else if (assist && S.window) {
+  if (assist && S.window) {
     const sum = S.me.handNumSum, num = S.window.card.num;
     const formula = sum === num
       ? `手札合計 <b>${sum}</b> ＝ 場の数字 <b>${num}</b>`
@@ -720,11 +695,11 @@ function layoutHand() {
   if (overlap <= 0) return;
   for (let i = 1; i < els.length; i++) els[i].style.marginLeft = (-overlap).toFixed(1) + 'px';
 }
-// ---------- 手札のドラッグ並び替え（並び替えモード中のみ有効） ----------
-// 通常時は手札ストリップの横スクロールとタップ操作を優先し、モード中だけ
-// touch-action:none でドラッグを確実に効かせる（タップで出す操作は無効化）。
+// ---------- 手札のドラッグ並び替え（update12・方針14: モード廃止、いつでも有効） ----------
+// 並び替えボタン／モードは廃止し、常時ドラッグで並び替えできる。閾値（12px）未満の
+// 動きはタップとして扱い、ドラッグが確定したら従来どおり直後の click を抑止する
 function handPointerDown(e) {
-  if (!sortingMode || !S || handDrag) return;
+  if (!S || !S.me || handDrag) return;
   const el = e.target.closest('#hand .card');
   if (!el || (e.button !== undefined && e.button > 0)) return;
   handDrag = { id: el.dataset.cid, el, pid: e.pointerId, startX: e.clientX, moved: false };
@@ -815,8 +790,19 @@ function selectionAction(card) {
   }
   return null;
 }
+// 操作フィードバック用トースト（update12・方針6）: 「タップしても無反応」を無くすため、
+// 確定しなかった操作には理由を短く出す（エラー帯とは別に、操作の近くで静かに知らせる）
+let toastTimer = null;
+function showToast(msg) {
+  const t = $('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
 function onTapCard(card) {
-  if (sortingMode) return; // 並び替えモード中はタップで出さない
   if (Date.now() < suppressTapUntil) return; // ドラッグ直後の誤爆防止
   spotInfo = null;
   hqShowBack = false;
@@ -830,7 +816,18 @@ function onTapCard(card) {
   // 2タップ目
   const act = selectionAction(card);
   if (!act || (act.kind && !act.choiceReady)) { // 出せない/条件未選択なら確定しない
-    if (!act) { selected = null; sendTouch(null); renderHand(); } // 出せない文脈での再タップは選択解除
+    if (!act) {
+      // 出せない文脈での再タップは選択解除。ただし「無反応」に見えないよう理由を添える
+      // （update12・方針6: 旧仕様はここで黙って解除していたのが無反応バグの一因）
+      selected = null; sendTouch(null); renderHand();
+      if (S && S.me && S.me.isMyTurn && S.phase === 'turn' && S.field) {
+        showToast(`いまの条件（${S.field.effSuit === 'W' ? '白' : '黒'}／${S.field.effBase}${S.field.effArrow === 'up' ? '以上↑' : '以下↓'}）では出せない`);
+      } else if (S && S.window) {
+        showToast('いまは出せない（ドボン受付中）');
+      }
+    } else {
+      showToast(act.kind === 'suit' ? '白か黒を選んでから、もう一度タップ' : '↑か↓を選んでから、もう一度タップ');
+    }
     renderSpotlight();
     return;
   }
@@ -884,12 +881,12 @@ function renderSpotlight() {
     backs.className = 'spot-backs';
     const fig = document.createElement('figure');
     fig.innerHTML = hqShowBack
-      ? `<img src="${ART24.hqBack}" alt="本部・夕景"><figcaption>裏（夕景）</figcaption>`
-      : `<img src="${ART24.hq}" alt="本部・真昼"><figcaption>表（真昼）</figcaption>`;
+      ? `<img src="${FACE_HQ_NIGHT_SRC}" alt="本部・夜"><figcaption>裏（夜）</figcaption>`
+      : `<img src="${FACE_HQ_SRC}" alt="本部・真昼"><figcaption>表（真昼）</figcaption>`;
     backs.appendChild(fig);
     const tog = document.createElement('button');
     tog.className = 'mini spot-hq-toggle';
-    tog.textContent = hqShowBack ? '表（真昼）を見る' : '裏（夕景）を見る';
+    tog.textContent = hqShowBack ? '表（真昼）を見る' : '裏（夜）を見る';
     tog.onclick = (ev) => { ev.stopPropagation(); hqShowBack = !hqShowBack; spotKey = ''; renderSpotlight(); };
     backs.appendChild(tog);
     panel.appendChild(backs);
@@ -1008,8 +1005,8 @@ function playOrigin(playerId, cardId) {
 }
 
 // ゴースト生成: 表裏2面の3D要素（内側 .flip-inner が rotateY で反転する）。
-// 裏面はボスの顔の裏面デザイン（card-back）。両面表の24（df）は裏面が存在しないので
-// 裏面を作らず、最初から表面を向けてフリップしない
+// 裏面は新裏面（faces/back.webp のメダリオン。CSS .flip-back が担う）。両面表の24（df）は
+// 裏面が存在しないので裏面を作らず、最初から表面を向けてフリップしない
 function buildPlayGhost(card, faceUp) {
   const ghost = document.createElement('div');
   ghost.className = 'fly-card play-ghost';
@@ -1154,7 +1151,7 @@ function showSettle() {
   const st = S.settle;
   const rows = st.transfers.map((t) => `<div class="transfer-row"><span>${nameOf(t.from)} → ${nameOf(t.to)}</span><b>${t.amount}点（札束${t.amount}）${t.partial ? ' ※払える分だけ' : ''}</b></div>`).join('');
   const cliffs = (st.cliffEvents || []).map((e) => e.kind === 'gake'
-    ? `<p>${nameOf(e.playerId)} は庇護の証を使った（裏返して「死」）</p>`
+    ? `<p>${nameOf(e.playerId)} はボスの信頼を使った（裏返して「死」）</p>`
     : `<p>${nameOf(e.playerId)} は破門（脱落）</p>`).join('');
   const scoreRows = S.players.map((p) => `<tr><td>${p.name}${p.id === st.markerId ? ` <img class="marker-img" src="${MARKER_IMG}" alt="後継者の証" title="後継者の証">` : ''}</td><td>${st.scores[p.id]}点</td></tr>`).join('');
   showModal(`<h3>${st.label}！</h3>
@@ -1231,6 +1228,16 @@ function updateTurnLeft() {
 setInterval(updateTurnLeft, 500);
 
 // ---------- 入口 ----------
+// 全画面化（update12・方針7）: ブラウザ仕様で表示直後の自動全画面は不可のため、
+// 入室/開始など「最初の必須タップ」の中で全画面化＋横画面固定を試みる（失敗は握りつぶす）
+function tryFullscreen() {
+  try {
+    if (document.fullscreenElement) return;
+    const p = document.documentElement.requestFullscreen && document.documentElement.requestFullscreen();
+    const done = () => { try { const q = screen.orientation.lock('landscape'); if (q && q.catch) q.catch(() => {}); } catch {} };
+    if (p && p.then) p.then(done).catch(() => {}); else done();
+  } catch {}
+}
 function entrySettings() {
   return {
     rounds: $('in-rounds').value,
@@ -1240,10 +1247,10 @@ function entrySettings() {
     dobonSec: 2.5,
   };
 }
-$('btn-create').onclick = () => send({ t: 'create', name: $('in-name').value.trim(), settings: entrySettings() });
-$('btn-test').onclick = () => send({ t: 'create', name: $('in-name').value.trim() || '幹部見習い', settings: { ...entrySettings(), rounds: '6' }, test: true, cpuCount: 3 });
-$('btn-join').onclick = () => send({ t: 'join', code: $('in-code').value.trim().toUpperCase(), name: $('in-name').value.trim() });
-$('btn-start').onclick = () => send({ t: 'start' });
+$('btn-create').onclick = () => { tryFullscreen(); send({ t: 'create', name: $('in-name').value.trim(), settings: entrySettings() }); };
+$('btn-test').onclick = () => { tryFullscreen(); send({ t: 'create', name: $('in-name').value.trim() || '幹部見習い', settings: { ...entrySettings(), rounds: '6' }, test: true, cpuCount: 3 }); };
+$('btn-join').onclick = () => { tryFullscreen(); send({ t: 'join', code: $('in-code').value.trim().toUpperCase(), name: $('in-name').value.trim() }); };
+$('btn-start').onclick = () => { tryFullscreen(); send({ t: 'start' }); };
 $('in-name2').onchange = () => send({ t: 'setName', name: $('in-name2').value.trim() });
 $('btn-dobon').onclick = () => send({ t: 'dobon' });
 $('btn-kaeshi').onclick = () => send({ t: 'kaeshi' });
@@ -1260,9 +1267,22 @@ $('btn-fullscreen').onclick = async () => {
 };
 $('btn-howto').onclick = () => showHowto();
 $('btn-howto2').onclick = () => showHowto();
-$('btn-sort').onclick = () => { sortingMode = !sortingMode; if (!sortingMode && handDrag) handPointerCancel(); render(); };
 window.addEventListener('resize', () => { if (S && S.me) layoutHand(); });
 $('hand').addEventListener('pointerdown', handPointerDown);
+// ドローは山札タップ（update12・方針10）: 自分の手番で引ける間だけ受理し、
+// 引けない状況でタップされたら理由をトーストで返す（無反応にしない）
+$('deck-pile').onclick = () => {
+  if (!S || !S.me) return;
+  if (S.me.isMyTurn && S.phase === 'turn') {
+    if (S.pendingDraw > 0) { showToast(`累積ドロー${S.pendingDraw}枚が来ている。「ドロー${S.pendingDraw}枚を引く」か2を出せ`); return; }
+    if (S.pendingReveal > 0) { showToast('公開が来ている。「公開する」か11を出せ'); return; }
+    if (S.mustNagashi) { showToast('場流し: 好きなカードを1枚出せ'); return; }
+    if (S.me.drewThisTurn) { showToast('もう引いた。出せるカードを出すか、山札の上のパスで終われ'); return; }
+    send({ t: 'draw' });
+  }
+};
+// パスは山札の上のプレート（update12・方針13）: 引いた後にだけ .show で現れる
+$('btn-pass').onclick = (e) => { e.stopPropagation(); send({ t: 'pass' }); };
 $('btn-end-reserve').onclick = () => { if (confirm('この夜が終わったら、抗争を終了するか？')) send({ t: 'endReserve' }); };
 $('btn-end-now').onclick = () => { if (confirm('今すぐ抗争を終了するか？')) send({ t: 'endNow' }); };
 function showDiscard() {
@@ -1272,7 +1292,9 @@ function showDiscard() {
   showModal(`<h3>捨て札（出た順・${S.discard.length}枚）</h3>`, 'generic');
   const g = document.createElement('div'); g.className = 'discard-grid';
   for (const c of S.discard) {
-    const mc = miniCard(c);
+    // update12: 一覧も完成面の縮小表示で統一する（数字チップの代用表示は使わない）
+    const mc = cardEl(c);
+    mc.classList.add('thumb');
     mc.onclick = () => { hideModal(); showInfoCard(c); };
     g.appendChild(mc);
   }

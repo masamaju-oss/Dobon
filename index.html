@@ -40,7 +40,7 @@
         </label>
         <label>脱落（破門）
           <select id="in-elimination">
-            <option value="1" selected>あり（公式形・庇護の証）</option>
+            <option value="1" selected>あり（公式形・ボスの信頼）</option>
             <option value="0">なし（マイナスOK）</option>
           </select>
         </label>
@@ -64,8 +64,8 @@
     <div class="panel art-gallery">
       <h3>カード見本</h3>
       <div class="gallery">
-        <img src="24.webp" alt="24番地"><img src="0.webp" alt="0番地・修道院">
-        <img src="7.webp" alt="7・顔役"><img src="11.webp" alt="11・内通者"><img src="2.webp" alt="2・押し付け">
+        <img src="faces/face-24-casino.webp" alt="24・カジノ"><img src="faces/face-0.webp" alt="0・修道院">
+        <img src="faces/face-7-W-up.webp" alt="7・顔役"><img src="faces/face-11-W-down.webp" alt="11・見張り"><img src="faces/face-2-W-up.webp" alt="2・荷運び">
       </div>
     </div>
   </section>
@@ -100,8 +100,9 @@
       <div id="seat-left" class="seat seat-side"></div>
       <div id="seat-right" class="seat seat-side"></div>
       <div id="table-center">
-        <div id="deck-pile" class="pile" title="山札">
-          <div class="card-back pile-stack"></div>
+        <div id="deck-pile" class="pile" title="山札（タップで1枚引く）">
+          <button id="btn-pass" class="pass-plate">パス</button>
+          <div class="pile-stack"><div class="card-back"></div><div class="card-back"></div><div class="card-back"></div></div>
           <span class="pile-label">山札 <span id="deck-count"></span></span>
         </div>
         <div id="field-col">
@@ -110,7 +111,7 @@
         </div>
         <div id="discard-pile" class="pile" title="捨て札（タップで一覧）">
           <div id="discard-top"></div>
-          <span class="pile-label">捨て札 <span id="discard-count"></span></span>
+          <span class="pile-label">捨て札</span>
         </div>
         <div id="field-info"></div>
       </div>
@@ -124,10 +125,9 @@
       <div id="hand-area">
         <div class="hand-head">
           <div id="hand-totals"></div>
-          <button id="btn-sort" class="mini">並び替え</button>
+          <div id="my-bundles"></div>
         </div>
         <div id="hand"></div>
-        <div id="my-bundles"></div>
       </div>
     </div>
     <div id="bottom-bar">
@@ -150,6 +150,9 @@
     <p class="kaeshi-note"><span id="kaeshi-sec">3</span>秒で自動発動</p>
   </div>
 </div>
+
+<!-- 操作フィードバック用トースト（update12） -->
+<div id="toast"></div>
 
 <!-- 出たカードの大写し（全員表示・操作を妨げない） -->
 <div id="played-overlay" class="hidden"></div>

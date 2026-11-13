@@ -48,6 +48,27 @@ function shuffle(arr, rng = Math.random) {
   return a;
 }
 
+// ---- カード面（face）対応表（update12） ----
+// カード表示は完成面画像（public/art/faces/）をそのまま使う方式に切り替えた。
+// スート判別は絵の昼夜のみ（W=昼の絵／B=夜の絵）で、この対応表が
+// 「データ（num/suit/arrow/draw5/artVariant/doubleFaced）⇔ 絵の昼夜」の一致を担保する
+// （方針5: スート監査はこの対応表＋単体テストで担保する）。
+// card は内部表現（artVariant）でも公開表現（art）でもよい。
+function faceForCard(card) {
+  if (!card) return null;
+  if (card.num === 0) return 'face-0.webp';
+  if (card.num === 24) {
+    const v = card.artVariant || card.art;
+    if (v === 'tower') return 'face-24-tower.webp';
+    if (v === 'hq') return 'face-24-hq.webp';
+    return 'face-24-casino.webp'; // 既定はカジノ
+  }
+  if (card.draw5) return 'face-1-B-up-draw5.webp'; // ドロー5黒1=密書（通常の黒1とは別面）
+  return `face-${card.num}-${card.suit}-${card.arrow}.webp`;
+}
+const FACE_BACK = 'back.webp';               // 通常の裏面（新メダリオン）
+const FACE_HQ_NIGHT = 'face-24-hq-night.webp'; // 両面表24（本部）の裏面位置に出す夜面
+
 // カードの得点（支払い計算用）: 0/24/ドロー5黒1=5点、2/7/11=2点、他=1点
 function cardPoints(card) {
   if (card.num === 0 || card.num === 24 || card.draw5) return 5;
@@ -123,7 +144,7 @@ function applyTransfers(players, transfers, eliminationOn) {
     if (!payer) continue;
     const payees = transfers.filter((x) => x.from === payerId);
     if (eliminationOn && total > payer.score) {
-      // 庇護の証 or 脱落: 残高全額を勝者へ均等配分（端数は箱へ）
+      // ボスの信頼 or 脱落: 残高全額を勝者へ均等配分（端数は箱へ）
       const balance = Math.max(0, payer.score);
       if (payer.chip === 'gake') {
         payer.chip = 'shi';
@@ -173,5 +194,5 @@ function rankings(playersArr, markerId) {
 module.exports = {
   buildDeck, shuffle, cardPoints, handPointSum, handNumberSum, maxCardPoints,
   canPlay, canDobon, pickRevealCards, computeTransfers, applyTransfers,
-  nextMarker, rankings,
+  nextMarker, rankings, faceForCard, FACE_BACK, FACE_HQ_NIGHT,
 };

@@ -16,9 +16,9 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 
 const server = http.createServer((req, res) => {
   let p = decodeURIComponent(req.url.split('?')[0]);
-  if (p === '/') p = '/index.html';
   const DENY = ['/server.js', '/game.js', '/package.json', '/package-lock.json'];
   if (DENY.includes(p) || p.startsWith('/test/')) { res.writeHead(404); res.end('not found'); return; }
+  if (p === '/') p = '/index.html';
   const file = path.join(PUBLIC, p);
   if (!file.startsWith(PUBLIC) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
     res.writeHead(404); res.end('not found'); return;
@@ -586,7 +586,9 @@ function gameOver(room) {
 }
 
 // ---------- 状態ビュー（個人別） ----------
-function publicCard(c) { return { id: c.id, num: c.num, suit: c.suit, arrow: c.arrow, draw5: !!c.draw5, pts: G.cardPoints(c), art: c.artVariant || null, df: !!c.doubleFaced }; }
+// face（update12）: 完成面画像のファイル名（faces/ 内）。対応表は game.js の faceForCard が正で、
+// クライアントはこの名前をそのまま使う（スート監査=データ⇔絵の昼夜の一致は対応表で担保）
+function publicCard(c) { return { id: c.id, num: c.num, suit: c.suit, arrow: c.arrow, draw5: !!c.draw5, pts: G.cardPoints(c), art: c.artVariant || null, df: !!c.doubleFaced, face: G.faceForCard(c) }; }
 function viewFor(room, me) {
   const now = Date.now();
   const total = { '6': 6, '8': 8, '10': 10 }[room.settings.rounds] || null;
