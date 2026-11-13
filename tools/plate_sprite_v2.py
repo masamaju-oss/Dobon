@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
-"""新ブランク鉄板のスプライト v2:
-- 輪郭マスクを滑らかに整える（縁の欠けを埋めてから輪郭を丸める）
-- 色合いを aged v2（24カジノ）の鉄板に合わせる（帯域別の色移転）
+"""ブランク鉄板のスプライト生成（真実源の正を再現する処理系）:
+- 入力: 第2版の原画 truth/approved/blank-plate-v2-raw.webp（コミット 813e66e の原画と同一）
+- 処理: 輪郭マスクを滑らかに整える／色合いを aged v2（24カジノ）の鉄板に合わせる（帯域別の色移転）
+  ／左上の切り欠き埋め／左側の光補正／左辺の縁の処理（soften_left_rim）
+- 出力: truth/approved/blank-plate.webp（現在の正・2026-11-14 差し替え）
 色の実測（中央値RGB）: 影 (21,26,23) / 中間 (71,67,56) / 高中間 (138,125,102) / 擦れ (231,204,161)
 = 温かい真鍮・生成り側に寄るアンティーク鉄。新鉄板は影は同じだが中間 (52,60,65) と
 擦れ (182,181,182) が冷たい灰色で暗い。"""
@@ -12,8 +14,6 @@ from PIL import Image, ImageFilter
 from scipy import ndimage
 
 TRUTH = pathlib.Path(__file__).resolve().parent.parent / 'truth' / 'approved'
-# 入力は第2版の原画（生成そのまま）。現行の approved/blank-plate.webp は処理後の正。
-# 原画は git 履歴から取り出す: git show 813e66e:truth/approved/blank-plate.webp > truth/approved/blank-plate-v2-raw.webp
 RAW = 'blank-plate-v2-raw.webp'
 
 # 輝度アンカー（帯域の代表輝度）と、その輝度での目標色／原色（中央値RGB）
@@ -129,7 +129,28 @@ def brighten_left(rgb, mask):
     return np.clip(rgb.astype(float) * gain[..., None], 0, 255).astype(np.uint8)
 
 
+def soften_left_rim(rgb, mask):
+    """左辺の縁の光がまっすぐな線になるのを崩す: 縁から18pxの帯を少し暗くし、
+    行ごとに滑らかな濃淡の揺らぎを入れる（特に明るい擦れの線を弱める）。"""
+    out = rgb.astype(float)
+    rng = np.random.default_rng(11)
+    noise = ndimage.gaussian_filter(rng.normal(1.0, 0.05, rgb.shape[0]), 9)
+    for y in range(460, 1321):
+        xs = np.where(mask[y])[0]
+        if len(xs) == 0:
+            continue
+        xL = xs.min()
+        band = out[y, xL:xL + 18]
+        t = np.linspace(0, 1, band.shape[0])[:, None]
+        f = (0.80 + 0.20 * t) * noise[y]
+        lum = band.mean(axis=1, keepdims=True)
+        f = np.where(lum > 120, f * 0.85, f)
+        out[y, xL:xL + 18] = band * f
+    return np.clip(out, 0, 255).astype(np.uint8)
+
+
 def sprite():
+    # 入力は第2版の原画（truth/approved/blank-plate-v2-raw.webp = コミット 813e66e の原画）
     bp = Image.open(TRUTH / RAW).convert('RGB')
     rgb = np.asarray(bp)
     m = raw_mask(bp)
@@ -137,7 +158,7 @@ def sprite():
     m = ndimage.binary_closing(m, structure=np.ones((9, 9)))
     mf = ndimage.gaussian_filter(m.astype(float), 5)
     m = ndimage.binary_fill_holes(mf > 0.45)
-    graded = brighten_left(grade(rgb), m)
+    graded = soften_left_rim(brighten_left(grade(rgb), m), m)
     rgba = Image.fromarray(graded).convert('RGBA')
     alpha = Image.fromarray((m * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(1.2))
     rgba.putalpha(alpha)
@@ -148,5 +169,6 @@ if __name__ == '__main__':
     sp = sprite()
     white = Image.new('RGB', sp.size, (255, 255, 255))
     white.paste(sp, (0, 0), sp)
+    sp.save(TRUTH / 'blank-plate.webp', lossless=True)
     white.save('/tmp/plate-graded-white.png')
-    print('saved /tmp/plate-graded-white.png')
+    print('saved truth/approved/blank-plate.webp + /tmp/plate-graded-white.png')

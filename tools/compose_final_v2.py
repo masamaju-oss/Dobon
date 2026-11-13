@@ -59,17 +59,41 @@ def make_base():
     img.paste(band, (86, 84))
     return img
 
+def _match_rows(top_img, bot_img, rows=10, fade=0.7):
+    """下ブロックの上端の色調を上ブロックの下端に合わせ、継ぎ目の段差を消す。"""
+    from scipy import ndimage as _ndi
+    t = np.asarray(top_img).astype(float)
+    b = np.asarray(bot_img).astype(float)
+    tm = _ndi.gaussian_filter(t[-rows:].mean(0), (30, 0))
+    bm = _ndi.gaussian_filter(b[:rows].mean(0), (30, 0))
+    off = (tm - bm)[None, :, :]
+    ramp = (1 - np.linspace(0, fade, b.shape[0]))[:, None, None]
+    return Image.fromarray(np.clip(b + off * ramp, 0, 255).astype(np.uint8))
+
+
 def effect_paper():
-    stripA = flatten_paper(V1.crop((480, 272, 1180, 368)).resize((700, 103)))
-    stripB = flatten_paper(V3.crop((760, 1660, 1160, 1790)).resize((700, 103)))
+    # 反転タイルは汚れが鏡合わせになるため廃止。実在の紙2種を回転・切り出しでつなぐ。
+    # 上下は122pxずつを38px重ねてぼかす（合計206px）。
+    stripA = flatten_paper(V1.crop((480, 284, 1180, 356)).resize((700, 122)))
+    stripB700 = flatten_paper(V3.crop((760, 1680, 1160, 1770)).resize((700, 122)))
+    stripB398 = flatten_paper(V3.crop((760, 1680, 1160, 1770)).resize((398, 122)))
+    top = Image.new("RGB", (1098, 122))
+    top.paste(stripA, (0, 0))
+    top.paste(stripB398, (700, 0))
+    bottom = Image.new("RGB", (1098, 122))
+    bottom.paste(stripA.transpose(Image.ROTATE_180), (0, 0))
+    bottom.paste(stripB700.crop((302, 0, 700, 122)), (700, 0))
+    bottom = _match_rows(top, bottom)
     paper = Image.new("RGB", (1098, 206))
-    paper.paste(stripA, (0, 0))
-    paper.paste(stripA.transpose(Image.FLIP_LEFT_RIGHT).crop((0, 0, 398, 103)), (700, 0))
-    paper.paste(stripA.transpose(Image.FLIP_TOP_BOTTOM), (0, 103))
-    paper.paste(stripA.transpose(Image.ROTATE_180).crop((0, 0, 398, 103)), (700, 103))
-    fa = Image.fromarray(np.tile(np.minimum(np.linspace(0, 255, 398) * 1.4, 255).astype(np.uint8), (103, 1)), "L")
-    paper.paste(stripB.crop((0, 0, 398, 103)), (700, 0), fa)
-    paper.paste(stripB.transpose(Image.FLIP_TOP_BOTTOM).crop((0, 0, 398, 103)), (700, 103), fa)
+    paper.paste(top, (0, 0))
+    vmask = Image.fromarray(np.tile(np.linspace(0, 255, 38).astype(np.uint8)[:, None], (1, 1098)), "L")
+    paper.paste(bottom.crop((0, 0, 1098, 38)), (0, 84), vmask)
+    paper.paste(bottom.crop((0, 38, 1098, 122)), (0, 122))
+    hmask = Image.fromarray(np.tile(np.linspace(0, 255, 49).astype(np.uint8)[None, :], (206, 1)), "L")
+    right = Image.new("RGB", (49, 206))
+    right.paste(top.crop((700, 0, 749, 122)), (0, 0))
+    right.paste(bottom.crop((700, 38, 749, 122)), (0, 122))
+    paper.paste(right, (676, 0), hmask)
     return paper
 
 PAPER = effect_paper()
