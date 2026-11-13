@@ -151,3 +151,60 @@ No text other than the numerals.
 
 - 本体の配置: 左端 x=45、本体幅 460、タブ頂点 y=83。鉄板全体を仕切り線が −2.2° になるよう回す。
 - 数字と札束は鉄板と一緒に傾け、矢印だけは傾けず軸平行に置く（従来の確定どおり）。
+
+## 傾き・吊りリンク・接続パーツの実測と言語化（2026-11-14、aged v2 原画から再測定）
+
+### 傾き
+
+- 基準線は鉄板内部の仕切り線。実測 **−2.23°**（右上がり）。測定は仕切り線の明部を列ごとに検出し直線フィット（x=90 で y≈311、x=490 で y≈296）。
+- 回転中心は吊り点（輪の中心）。鉄板は輪を中心に傾く。
+- 一緒に傾くもの: 本体・タブ・輪・数字・札束。傾かないもの: 吊りリンク（重力で垂直を保つ）、矢印（軸平行を保つ）。
+- したがって鎖と鉄板の角度差は常に 2.23° ある。
+
+### 吊りリンク（鎖）
+
+- 正体: 細い多連チェーンではなく、**太い鉄バーの単一リンク（縦長の輪）** がカード上端から垂直に降りる。
+- 実測（カード座標）: 幅 ≈60px（本体幅の約13%）、中心軸 x≈195、上端はカードの上辺（y=0）で切れて画面外へ抜ける。下端は輪に入り込む。
+- 色: 暗い茶黒の鉄 RGB ≈ (70, 55, 36)。中央に縦のハイライトが走る。
+- 輪との関係: リンクは輪の穴を、カード面に平行な向きで通る。リンクの下部は輪の奥側に隠れ、上部だけが見える。
+
+### 接続パーツ（輪とタブ）
+
+- 輪は鉄板上辺の盛り上がり（タブ）の頂点にある、盛り上がった円形のアイレット（同心円の段を持つボス）。中心はカード座標 ≈ (195, 95)、外径 ≈90px。
+- **輪の中心は本体の横中心（x≈275）ではなく、本体左端から約35%の位置（x≈195）にある**（実測上の重要事実）。
+- タブは輪を抱える土台で、左右へ鞍部を経て肩へ流れ、付け根に渦巻き状の装飾がある。
+- 輪とタブは本体と一体で、傾きに追従する。リンクだけが追従しない。
+
+### 重なり順（手前→奥）
+
+1. 輪の前側リムとタブ（鉄板の一部）
+2. リンク（輪の穴の中で奥に隠れる部分がある）
+3. 名前欄・枠などの紙面
+- リンクと輪は紙面に柔らかい影を右下へ落とす。
+
+### 再現プロンプト（吊りまわり）
+
+```
+The plate hangs from a single thick dark-iron link (an elongated oval
+ring of heavy bar, about 13% of the plate body's width, RGB about
+70,55,36, with a vertical highlight along its center) that descends
+perfectly vertically from the top edge of the card and out of frame.
+It passes through a raised circular eyelet boss with concentric rings
+(outer diameter about 90px at card scale) set into the crest tab at the
+top of the plate. The hanging point is NOT at the body's horizontal
+center: it sits at about 35% of the body width from the left edge. The
+plate, its tab and its eyelet tilt together at -2.23 degrees around the
+eyelet's center (divider line as reference, right side up); the link
+stays vertical, so link and plate always differ by that angle. Soft
+drop shadows fall to the lower right onto the paper.
+```
+
+### ブランク鉄板（承認済み原本）の実測と、v2 との差異
+
+- スプライト外接: x 104〜1167（本体幅 ≈1063）、y 8〜1554（画像 1280×1728）。
+- ポスト: y 8〜125、幅 ≈112、中心 x≈632（本体の横中心と一致）。輪の構造は y ≈125〜230、中心 ≈ (632, 175)。
+- 肩ラインは y≈335、下辺は y=1554。仕切り線は y≈1037（肩〜下辺の約57%）。
+- 差異1: 輪が本体の中央にある（v2 は左から35%）。
+- 差異2: 本体の縦横比が v2 より縦長（肩〜下辺/本幅: ブランク ≈1.16、v2 ≈0.88）。
+- 差異3: ポスト＋輪の積み上げが肩から約200px（画像座標）あり、v2 の「肩の位置にある輪＋その上のリンク」と積み上げ方が違う。
+- 合成上の帰結: ブランク鉄板では「本体を v2 の位置に置く」「輪とポストを v2 のように見せる」を同時には満たせない。当面の合成では、本体位置を優先しつつ全体を下げ、ポストが上端から抜け輪が見える位置に置く（2026-11-14 の夜顔役で採用）。
