@@ -17,7 +17,8 @@
 | 効果アイコン SUIT | icon-suit.png | 派生（シートv4から切り出し） | 本人「公開以外OK」 | prompts/effect-icons-approved.md |
 | 効果アイコン DRAW 2 | icon-draw2.png | 派生（同上） | 同上 | 同上 |
 | 効果アイコン DRAW 5 | icon-draw5.png | 派生（同上） | 同上 | 同上 |
-| 枠・名前欄（aged v1由来） | （画像は作業場の aged v1 が原本） | 原本 | 棚卸しで「枠、名前欄、カジノイラストOK」 | prompts/name-band.md・plate.md（移行ドラフト） |
+| 枠・名前欄（aged v1由来） | （画像は作業場の aged v1 が原本） | 原本 | 棚卸しで「枠、名前欄、カジノイラストOK」。※枠については2026-11-14に aged v2 が正規品となり差し替え（下記）。名前欄の地色は再確認待ち | prompts/name-band.md・plate.md（移行ドラフト） |
+| 枠（aged v2由来） | （画像は作業場の aged v2 が原本）／透過版 frame-aged-v2-alpha.png（派生） | 原本＋派生 | 2026-11-14 本人「この絵の枠を正規品とします」 | prompts/frame.md |
 | 紙質（aged v3由来） | （画像は作業場の aged v3 が原本） | 原本 | 棚卸しで「紙質OK」 | prompts/design-notes-2026-11-13.md（移行ドラフト） |
 | 鉄板デザイン・配置・吊り（aged v2由来） | （画像は作業場の aged v2 が原本） | 原本 | 棚卸しで「鉄板デザインOK 数字矢印札束配置OK 画面外から吊られている表現OK」「矢印OK 数字フォントOK 数字の僅かな汚れOK」 | prompts/plate.md（移行ドラフト） |
 
