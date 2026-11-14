@@ -89,3 +89,9 @@
 | 項目 | ファイル | 種別 | 承認の根拠 | 仕様 |
 |---|---|---|---|---|
 | ブランク鉄板（整えた鉄板＋左辺処理） | blank-plate.webp | 派生（第4弾＋左辺の縁の処理 soften_left_rim） | 夜顔役の面（v8・v9）で本人が確認し、鉄板の位置を「完璧」と確定（2026-11-14）。面で使った候補と画素単位で同一であることを確認して差し替え | prompts/blank-plate.md／処理は tools/plate_sprite_v2.py（入力は同フォルダの blank-plate-v2-raw.webp＝第2版の原画） |
+
+## 登録済み（2026-11-14 第6弾）
+
+| 項目 | ファイル | 種別 | 承認の根拠 | 仕様 |
+|---|---|---|---|---|
+| ブランク鉄板（第6弾：縁の拡大・立体感・明るさのグラデーション） | blank-plate.webp | 派生（第5弾＋standardize_rim／brighten／level_light） | 夜顔役の面 v12〜v17 を本人が確認し「鉄板を確定とします。OK」（2026-11-14）。処理系の再生成出力が作業場の候補と画素単位で同一であることを確認して差し替え | prompts/blank-plate.md／処理は tools/plate_sprite_v2.py（入力は同フォルダの blank-plate-v2-raw.webp） |
